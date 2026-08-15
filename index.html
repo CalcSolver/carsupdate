@@ -39,8 +39,6 @@
         <div class="menuitem title">Pick a name:<br/><input id="name" class="title" placeholder="Name" autocomplete="off"></input></div>
         
         <script>
-            var color, updateColor, menu2, host, joinGame, codeCheck;
-
             // Firebase Configuration
             const firebaseConfig = {
               apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
@@ -53,7 +51,6 @@
               measurementId: "G-R80VNMYKWR"
             };
 
-            // Initialize Firebase
             if (!firebase.apps.length) {
               firebase.initializeApp(firebaseConfig);
             }
@@ -65,7 +62,7 @@
                 <div id="slider"></div>
             </div>
         </div>
-        <div class="menuitem title"><div id="start" onclick="menu2()">Start!</div></div>
+        <div class="menuitem title"><div id="start" onclick="if(typeof menu2 === 'function'){ menu2(); } else if(window.menu2){ window.menu2(); }">Start!</div></div>
         
         <div id="settings" onclick="this.parentNode.children[7].className = this.parentNode.children[7].className == 'sel' ? '' : 'sel';"></div>
         <div id="toolbar">
