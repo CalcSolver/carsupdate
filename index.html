@@ -40,6 +40,24 @@
         
         <script>
             var color, updateColor, menu2, host, joinGame, codeCheck;
+
+            // Firebase Configuration
+            const firebaseConfig = {
+              apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
+              authDomain: "racing-game-67477.firebaseapp.com",
+              databaseURL: "https://racing-game-67477-default-rtdb.firebaseio.com",
+              projectId: "racing-game-67477",
+              storageBucket: "racing-game-67477.firebasestorage.app",
+              messagingSenderId: "48596697348",
+              appId: "1:48596697348:web:897b9f78e511bc2f635051",
+              measurementId: "G-R80VNMYKWR"
+            };
+
+            // Initialize Firebase
+            if (!firebase.apps.length) {
+              firebase.initializeApp(firebaseConfig);
+            }
+            var db = firebase.database();
         </script>
         
         <div class="menuitem title">Choose a color:<br/>
