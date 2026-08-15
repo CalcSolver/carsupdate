@@ -12,98 +12,34 @@ var LAPS = 5;
 
 function MODS() {}
 
+// Replace these placeholders with your actual Firebase project configuration:
 var serverList = [
     {
-        apiKey: "AIzaSyDiJsMLlix5o9XqPW1EpeBvuA15XNjlR8M",
-        authDomain: "car-game-a86b9.firebaseapp.com",
-        databaseURL: "https://car-game-a86b9.firebaseio.com",
-        projectId: "car-game-a86b9",
-        storageBucket: "car-game-a86b9.appspot.com",
-        messagingSenderId: "722396856191",
-        appId: "1:722396856191:web:fb5f72917856108a50e44a"
-    },
-    {
-        apiKey: "AIzaSyCsqpn0aTDqU8ffGVE284fmSEOTK2tOgq8",
-        authDomain: "car-game-backup.firebaseapp.com",
-        databaseURL: "https://car-game-backup.firebaseio.com",
-        projectId: "car-game-backup",
-        storageBucket: "car-game-backup.appspot.com",
-        messagingSenderId: "1015722732476"
-    },
-    {
-        apiKey: "AIzaSyDNuMPH_bg8Orkndl8Md6lUh_EOS3pitGs",
-        authDomain: "car-game-backup-2.firebaseapp.com",
-        databaseURL: "https://car-game-backup-2-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-2",
-        storageBucket: "car-game-backup-2.appspot.com",
-        messagingSenderId: "250860288006",
-        appId: "1:250860288006:web:9df8ed3929e7fceb2d2b87"
-    },
-    {
-        apiKey: "AIzaSyCmfz7RvzLaAo4xIxA-sH3qhXuGQZYMuvE",
-        authDomain: "car-game-backup-3.firebaseapp.com",
-        databaseURL: "https://car-game-backup-3-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-3",
-        storageBucket: "car-game-backup-3.appspot.com",
-        messagingSenderId: "477326457153",
-        appId: "1:477326457153:web:421821136bcc6a67f149c0"
-    },
-    {
-        apiKey: "AIzaSyAerrEq1YUJNZnvQhZvyRa6LOS9VyhEYvs",
-        authDomain: "car-game-backup-4.firebaseapp.com",
-        databaseURL: "https://car-game-backup-4-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-4",
-        storageBucket: "car-game-backup-4.appspot.com",
-        messagingSenderId: "802151922986",
-        appId: "1:802151922986:web:69b9ff0ad8778d51da7253"
-    },
-    {
-        apiKey: "AIzaSyCdVFLbMypdHR60NqXYs_qSpAdvvgpo9Ig",
-        authDomain: "car-game-backup-5.firebaseapp.com",
-        databaseURL: "https://car-game-backup-5-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-5",
-        storageBucket: "car-game-backup-5.appspot.com",
-        messagingSenderId: "743331533949",
-        appId: "1:743331533949:web:a724977f309c1583400d14"
-    },
-    {
-        apiKey: "AIzaSyDRmEJMfrk_y1-BLjgaD6ctaDfP8tKSyfA",
-        authDomain: "car-game-backup-6.firebaseapp.com",
-        databaseURL: "https://car-game-backup-6-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-6",
-        storageBucket: "car-game-backup-6.appspot.com",
-        messagingSenderId: "1025140224576",
-        appId: "1:1025140224576:web:cb239ab3773cb7596125a5"
-    },
-    {
-        apiKey: "AIzaSyA1y6TdFz2F0oahE-HmkA0mTAROlgIytR4",
-        authDomain: "car-game-backup-7.firebaseapp.com",
-        databaseURL: "https://car-game-backup-7-default-rtdb.firebaseio.com",
-        projectId: "car-game-backup-7",
-        storageBucket: "car-game-backup-7.appspot.com",
-        messagingSenderId: "1012238241918",
-        appId: "1:1012238241918:web:d4188393dcd596b6a6882f"
+        apiKey: "YOUR_ACTUAL_API_KEY",
+        authDomain: "your-app.firebaseapp.com",
+        databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+        projectId: "your-app",
+        storageBucket: "your-app.appspot.com",
+        messagingSenderId: "123456789"
     }
 ];
 
 var database, connectedN = -1, connectedS = undefined;
+
 for (var i = 0; i < serverList.length; i++) {
     firebase.initializeApp(serverList[i], "server" + i);
     let li = i;
     let la = firebase.apps[i];
-    if (i == 0) {
-        try {
-            la.analytics();
-        } catch {}
-    }
+    
     let tm = setTimeout(function() {
-        la.delete();
+        try { la.delete(); } catch(e) {}
     }, 5000);
+
     la.auth().signInAnonymously().then(() => {
         database = la.database();
         database.ref("/testServer").once("value", function(e) {
             clearTimeout(tm);
-            if (connectedN >= 0 && connectedN > li)
+            if (connectedN >= 0 && connectedN > li && connectedS)
                 connectedS.delete();
             if (connectedN < 0 || connectedN > li) {
                 database = la.database();
@@ -247,6 +183,11 @@ var menu2 = function() {
     }, 500);
 }
 
+window.startGame = function() {
+    if (!database || !code) return;
+    database.ref(code + "/status").set(1);
+}
+
 var host = function() {
     document.getElementById("host").onclick = null;
     f.style.transform = "translate3d(0, -100vh, 0)";
@@ -259,10 +200,16 @@ var host = function() {
     }, 1000);
 
     function getCode() {
+        if (!database) {
+            setTimeout(getCode, 500);
+            return;
+        }
+
         code = "";
-        var letters = "ABCDEFGHIJKLMMNOPQRSTUVWXYZ";
+        var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (var i = 0; i < 4; i++)
             code += letters[Math.floor(Math.random() * letters.length)];
+
         database.ref(code).once("value", function(codeCheck) {
             if (codeCheck.val() == null || codeCheck.val().status == -1 || !codeCheck.val().timestamp || Date.now() - codeCheck.val().timestamp > 1000 * 60 * 60 * 24) {
                 document.getElementById("code").innerHTML = code;
@@ -274,98 +221,7 @@ var host = function() {
                     timestamp: Date.now()
                 });
 
-                database.ref(code + "/players").on("child_added", function(p) {
-                    players[p.ref_.path.pieces_[2]] = {
-                        data: p.val(),
-                        model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
-                    };
-                    var pl = players[p.ref_.path.pieces_[2]];
-                    pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-                    pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
-                    var wheel = new THREE.Mesh(
-                        new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
-                        new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
-                    );
-                    var w1 = wheel.clone();
-                    w1.position.set(0.6, -0.1, 0.7);
-                    w1.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w1);
-                    var w2 = wheel.clone();
-                    w2.position.set(-0.6, -0.1, 0.7);
-                    w2.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w2);
-                    var w3 = wheel.clone();
-                    w3.position.set(0.6, -0.1, -0.7);
-                    w3.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w3);
-                    var w4 = wheel.clone();
-                    w4.position.set(-0.6, -0.1, -0.7);
-                    w4.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w4);
-                    var label = document.createElement("DIV");
-                    label.className = "label";
-                    label.innerHTML = pl.data.name.replaceAll("<", "&lt;") + "<br/>|";
-                    pl.label = label;
-                    label.position = pl.model.position;
-                    f.appendChild(label);
-                    labels.push(label);
-                    pl.model.receiveShadow = true;
-                    scene.add(pl.model);
-
-                    if (p.ref_.path.pieces_[2] == me.ref.path.pieces_[2]) {
-                        me.label = pl.label;
-                        me.model = pl.model;
-                        me.label.innerHTML = "";
-                    }
-                });
-
-                database.ref(code + "/players").on("child_changed", function(p) {
-                    players[p.ref_.path.pieces_[2]].data = p.val();
-                });
-
-                me.ref = database.ref(code + "/players").push();
-                me.data = {
-                    x: 0,
-                    y: 0,
-                    xv: 0,
-                    yv: 0,
-                    dir: 0,
-                    steer: 0,
-                    color: color,
-                    name: name,
-                    checkpoint: 1,
-                    lap: 0,
-                    collision: {}
-                };
-                me.ref.set(me.data);
-
-                database.ref(code + "/status").on("value", function(v) {
-                    v = v.val();
-                    if (v == 1) {
-                        if (document.getElementsByClassName("info")[0]) document.getElementsByClassName("info")[0].outerHTML = "";
-                        if (document.getElementById("startgame")) document.getElementById("startgame").outerHTML = "";
-
-                        gameStarted = true;
-                        gameSortaStarted = true;
-
-                        var countDown = document.createElement("DIV");
-                        countDown.innerHTML = "3";
-                        countDown.className = "title";
-                        countDown.id = "countdown";
-                        f.appendChild(countDown);
-
-                        lap = document.createElement("DIV");
-                        lap.innerHTML = "1/" + LAPS;
-                        lap.className = "title";
-                        lap.id = "lap";
-                        f.appendChild(lap);
-
-                        setTimeout(function() { countDown.innerHTML = "2"; }, 1000);
-                        setTimeout(function() { countDown.innerHTML = "1"; }, 2000);
-                        setTimeout(function() { countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
-                        setTimeout(function() { countDown.innerHTML = ""; }, 4000);
-                    }
-                });
+                setupPlayerListeners();
             } else {
                 getCode();
             }
@@ -373,6 +229,109 @@ var host = function() {
     }
 
     join();
+}
+
+function setupPlayerListeners() {
+    database.ref(code + "/players").on("child_added", function(p) {
+        var key = p.key;
+        players[key] = {
+            data: p.val(),
+            model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
+        };
+        var pl = players[key];
+        pl.model.position.set(pl.data.x, 0.6, pl.data.y);
+        pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
+        
+        var wheel = new THREE.Mesh(
+            new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
+            new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
+        );
+        var w1 = wheel.clone(); w1.position.set(0.6, -0.1, 0.7); w1.rotation.set(Math.PI / 2, 0, Math.PI / 2); pl.model.add(w1);
+        var w2 = wheel.clone(); w2.position.set(-0.6, -0.1, 0.7); w2.rotation.set(Math.PI / 2, 0, Math.PI / 2); pl.model.add(w2);
+        var w3 = wheel.clone(); w3.position.set(0.6, -0.1, -0.7); w3.rotation.set(Math.PI / 2, 0, Math.PI / 2); pl.model.add(w3);
+        var w4 = wheel.clone(); w4.position.set(-0.6, -0.1, -0.7); w4.rotation.set(Math.PI / 2, 0, Math.PI / 2); pl.model.add(w4);
+        
+        var label = document.createElement("DIV");
+        label.className = "label";
+        label.innerHTML = (pl.data.name || "").replace(/</g, "&lt;") + "<br/>|";
+        pl.label = label;
+        label.position = pl.model.position;
+        f.appendChild(label);
+        labels.push(label);
+        pl.model.receiveShadow = true;
+        scene.add(pl.model);
+
+        if (me.ref && key == me.ref.key) {
+            me.label = pl.label;
+            me.model = pl.model;
+            me.label.innerHTML = "";
+        }
+    });
+
+    database.ref(code + "/players").on("child_changed", function(p) {
+        if (players[p.key]) {
+            players[p.key].data = p.val();
+        }
+    });
+
+    me.ref = database.ref(code + "/players").push();
+    me.data = {
+        x: 0,
+        y: 0,
+        xv: 0,
+        yv: 0,
+        dir: 0,
+        steer: 0,
+        color: color,
+        name: name,
+        checkpoint: 1,
+        lap: 0,
+        collision: {}
+    };
+    me.ref.set(me.data);
+
+    database.ref(code + "/status").on("value", function(v) {
+        var status = v.val();
+        if (status == 1) {
+            if (document.getElementsByClassName("info")[0]) document.getElementsByClassName("info")[0].outerHTML = "";
+            if (document.getElementById("startgame")) document.getElementById("startgame").outerHTML = "";
+
+            gameStarted = true;
+            gameSortaStarted = true;
+
+            var countDown = document.createElement("DIV");
+            countDown.innerHTML = "3";
+            countDown.className = "title";
+            countDown.id = "countdown";
+            f.appendChild(countDown);
+
+            lap = document.createElement("DIV");
+            lap.innerHTML = "1/" + LAPS;
+            lap.className = "title";
+            lap.id = "lap";
+            f.appendChild(lap);
+
+            setTimeout(function() { countDown.innerHTML = "2"; }, 1000);
+            setTimeout(function() { countDown.innerHTML = "1"; }, 2000);
+            setTimeout(function() { countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
+            setTimeout(function() { countDown.innerHTML = ""; }, 4000);
+        }
+    });
+}
+
+window.codeCheck = function(e) {
+    if (e.keyCode === 13) {
+        var inputVal = document.getElementById("incode").value.toUpperCase();
+        if (!database) return;
+        database.ref(inputVal).once("value", function(snap) {
+            if (snap.exists() && snap.val().status === 0) {
+                code = inputVal;
+                setupPlayerListeners();
+            } else {
+                alert("Invalid Code or Game already started!");
+            }
+        });
+    }
 }
 
 var joinGame = function() {
@@ -390,6 +349,7 @@ var joinGame = function() {
 var map, trees, signs, startc, main;
 
 function deleteMap() {
+    if (!map) return;
     while (map.children.length > 0) map.remove(map.children[0]);
     scene.remove(map);
     while (trees.children.length > 0) trees.remove(trees.children[0]);
@@ -552,10 +512,6 @@ function join() {
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    var ray = new THREE.Raycaster();
-    ray.near = 0;
-    ray.far = 1;
-
     var ren = renderer;
     var controls;
     if (VR) {
@@ -565,6 +521,16 @@ function join() {
         ren = effect;
         controls = new THREE.DeviceOrientationControls(camera);
     }
+
+    // Key listeners for movement controls
+    window.addEventListener('keydown', function(e) {
+        if (e.key === "ArrowLeft" || e.key === "a") left = true;
+        if (e.key === "ArrowRight" || e.key === "d") right = true;
+    });
+    window.addEventListener('keyup', function(e) {
+        if (e.key === "ArrowLeft" || e.key === "a") left = false;
+        if (e.key === "ArrowRight" || e.key === "d") right = false;
+    });
 
     var lastTime = performance.now();
     function render(timestamp) {
@@ -582,8 +548,16 @@ function join() {
             if (VR) me.data.steer = camera.rotation.z;
             me.data.steer = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, me.data.steer));
 
-            if (me.ref && players[me.ref.path.pieces_[2]]) {
-                players[me.ref.path.pieces_[2]].data = me.data;
+            // Sync position to Firebase
+            if (me.ref) {
+                me.ref.update({
+                    x: me.data.x,
+                    y: me.data.y,
+                    xv: me.data.xv,
+                    yv: me.data.yv,
+                    dir: me.data.dir,
+                    steer: me.data.steer
+                });
             }
 
             if (!gameSortaStarted) {
