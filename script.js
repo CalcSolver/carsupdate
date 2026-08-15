@@ -45,7 +45,7 @@ function initFirebase() {
 }
 initFirebase();
 
-// Menu Slide Animations
+// Menu Animations
 function animateElement(id, delay) {
     setTimeout(function() {
         var el = document.getElementById(id);
@@ -75,6 +75,10 @@ scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.zIndex = "-1";
 
 var element = renderer.domElement;
 var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
@@ -88,7 +92,6 @@ var updateColor = function() {
         s.style.marginLeft = (color / 360 * 80) + "vw";
         s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
     }
-    if (document.body) document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
 }
 updateColor();
 
@@ -168,7 +171,6 @@ window.host = function() {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Use this code to join!<div id='code'>Loading...</div></div><div id='startgame' class='title' ontouchstart='startGame()' onclick='startGame()'>Start!</div>";
-            f.appendChild(element);
             f.style.transform = "none";
             getCode();
         }, 1000);
@@ -207,7 +209,6 @@ window.joinGame = function() {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Enter Code:<input id='incode' class='title' onkeyup='codeCheck(event)'></input></div>";
-            f.appendChild(element);
             f.style.transform = "none";
         }, 1000);
     }
@@ -229,7 +230,6 @@ function setupPlayerListeners() {
     createLocalPlayer();
     if (!database || !code) return;
 
-    // Listen for new players
     database.ref(code + "/players").on("child_added", function(p) {
         var key = p.key;
         if (players[key]) return;
@@ -243,7 +243,6 @@ function setupPlayerListeners() {
         players[key] = { data: playData, model: model };
     });
 
-    // Listen for position changes from multiplayer host/joiners
     database.ref(code + "/players").on("child_changed", function(p) {
         var key = p.key;
         if (players[key] && key !== me.key) {
@@ -299,7 +298,6 @@ function loadMap() {
     }
     scene.add(mapObj);
 
-    // Green Grass Ground Plane
     var ground = new THREE.Mesh(
         new THREE.PlaneBufferGeometry(2000, 2000),
         new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
@@ -343,6 +341,10 @@ function checkWallCollisions(player) {
 }
 
 function join() {
+    if (!document.body.contains(element)) {
+        document.body.appendChild(element);
+    }
+
     loadMap();
 
     camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -354,7 +356,6 @@ function join() {
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    // Keyboard controls
     window.addEventListener('keydown', function(e) {
         if (e.key === "ArrowLeft" || e.key === "a") left = true;
         if (e.key === "ArrowRight" || e.key === "d") right = true;
@@ -364,7 +365,6 @@ function join() {
         if (e.key === "ArrowRight" || e.key === "d") right = false;
     });
 
-    // iPad / Touch Controls
     window.addEventListener('touchstart', function(e) {
         if (e.touches && e.touches[0]) {
             var touchX = e.touches[0].clientX;
@@ -406,7 +406,6 @@ function join() {
                 me.model.position.z = me.data.y;
                 me.model.rotation.y = me.data.dir;
 
-                // Broadcast local coordinates to Firebase if connected
                 if (database && code && me.key) {
                     database.ref(code + "/players/" + me.key).set({
                         x: me.data.x,
@@ -418,7 +417,6 @@ function join() {
                 }
             }
 
-            // Smooth Camera Tracking
             camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
             camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
             camera.position.y = me.model.position.y + 3;
