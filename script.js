@@ -46,7 +46,7 @@ function initFirebase() {
 }
 initFirebase();
 
-// Restore original animations
+// Original Animations
 setTimeout(function() {
     if (document.getElementById("title")) document.getElementById("title").style.transform = "none";
 }, 500);
@@ -255,73 +255,46 @@ function setupPlayerListeners() {
     });
 }
 
-// Full OG Track Generator Parsing Function
+// 100% Original Map Parser
+var map, trees, signs, startc, main;
 function loadMap() {
     scene.background = new THREE.Color(0x7fb0ff);
 
-    var trackRaw = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML : "";
-    var points = [];
+    var trackElem = document.getElementById("trackcode");
+    if (!trackElem || !trackElem.innerHTML.includes("|")) return;
 
-    if (trackRaw && trackRaw.trim() !== "") {
-        var pairs = trackRaw.split(";");
-        for (var i = 0; i < pairs.length; i++) {
-            var coords = pairs[i].split(",");
-            if (coords.length === 2) {
-                points.push({ x: parseFloat(coords[0]) * mapscale, y: parseFloat(coords[1]) * mapscale });
-            }
-        }
+    var parts = trackElem.innerHTML.trim().split("|");
+    var racedata = parts[0].trim().split(" ");
+    var material = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xf48342) });
+
+    map = new THREE.Object3D();
+    for (var i = 0; i < racedata.length; i++) {
+        if (racedata[i] == "" || !racedata[i].includes("/")) continue;
+        var p1 = racedata[i].split("/")[0].split(",");
+        var p2 = racedata[i].split("/")[1].split(",");
+        var point1 = new THREE.Vector2(parseFloat(p1[0]), parseFloat(p1[1]));
+        var point2 = new THREE.Vector2(parseFloat(p2[0]), parseFloat(p2[1]));
+
+        var wall = new THREE.Mesh(
+            new THREE.BoxBufferGeometry(point1.distanceTo(point2) * mapscale + 0.3, 1.5, 0.3),
+            material
+        );
+        var angle = Math.atan2((point1.y - point2.y), (point1.x - point2.x));
+        wall.position.set(-(point1.x + point2.x) / 2 * mapscale, 0.75, (point1.y + point2.y) / 2 * mapscale);
+        wall.rotation.set(0, angle, 0, "YXZ");
+        map.add(wall);
     }
+    scene.add(map);
 
-    // Default Track Fallback if trackcode is missing
-    if (points.length === 0) {
-        points = [
-            { x: -50, y: -50 }, { x: 50, y: -50 },
-            { x: 50, y: 50 }, { x: -50, y: 50 }
-        ];
-    }
-
-    // Ground Grass Plane
-    var groundGeo = new THREE.PlaneBufferGeometry(1000, 1000);
-    var groundMat = new THREE.MeshLambertMaterial({ color: 0x57c115 });
-    var ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    scene.add(ground);
-
-    // Build Original Walls & Road Segments
-    var wallMat = new THREE.MeshLambertMaterial({ color: 0xf48342 });
-    var roadMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
-
-    for (var i = 0; i < points.length; i++) {
-        var p1 = points[i];
-        var p2 = points[(i + 1) % points.length];
-
-        var dx = p2.x - p1.x;
-        var dy = p2.y - p1.y;
-        var dist = Math.sqrt(dx * dx + dy * dy);
-        var angle = Math.atan2(dx, dy);
-
-        // Asphalt Road Track Segment
-        var roadGeo = new THREE.PlaneBufferGeometry(12, dist);
-        var road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        road.rotation.z = -angle;
-        road.position.set((p1.x + p2.x) / 2, 0.01, (p1.y + p2.y) / 2);
-        scene.add(road);
-
-        // Track Side Guard Rails
-        var wallGeo = new THREE.BoxBufferGeometry(WALL_SIZE, 2, dist);
-        
-        var leftWall = new THREE.Mesh(wallGeo, wallMat);
-        leftWall.position.set((p1.x + p2.x) / 2 - Math.cos(angle) * 6, 1, (p1.y + p2.y) / 2 + Math.sin(angle) * 6);
-        leftWall.rotation.y = angle;
-        scene.add(leftWall);
-
-        var rightWall = new THREE.Mesh(wallGeo, wallMat);
-        rightWall.position.set((p1.x + p2.x) / 2 + Math.cos(angle) * 6, 1, (p1.y + p2.y) / 2 - Math.sin(angle) * 6);
-        rightWall.rotation.y = angle;
-        scene.add(rightWall);
-    }
+    // Ground Plane
+    main = new THREE.Object3D();
+    var ground = new THREE.Mesh(
+        new THREE.PlaneBufferGeometry(1000, 1000),
+        new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
+    );
+    ground.rotation.set(-Math.PI / 2, 0, 0);
+    main.add(ground);
+    scene.add(main);
 }
 
 function join() {
