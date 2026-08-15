@@ -72,13 +72,17 @@ forceScroll();
 // Scene & Renderer Setup
 var camera, renderer, scene;
 scene = new THREE.Scene();
-renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
+
+// Ensure the game canvas sits behind the menu foreground overlay
 renderer.domElement.style.position = "fixed";
 renderer.domElement.style.top = "0";
 renderer.domElement.style.left = "0";
-renderer.domElement.style.zIndex = "-1";
+renderer.domElement.style.width = "100vw";
+renderer.domElement.style.height = "100vh";
+renderer.domElement.style.zIndex = "1";
 
 var element = renderer.domElement;
 var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
@@ -91,6 +95,9 @@ var updateColor = function() {
     if (s) {
         s.style.marginLeft = (color / 360 * 80) + "vw";
         s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
+    }
+    if (document.body) {
+        document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
     }
 }
 updateColor();
