@@ -28,7 +28,7 @@ function initFirebase() {
     if (database) return;
     try {
         var app;
-        var existingApp = firebase.apps && firebase.apps.find(function(a) { return a.name === 'server0'; });
+        var existingApp = typeof firebase !== 'undefined' && firebase.apps && firebase.apps.find(function(a) { return a.name === 'server0'; });
         if (existingApp) {
             app = existingApp;
         } else if (typeof firebase !== 'undefined') {
@@ -39,29 +39,33 @@ function initFirebase() {
             app.auth().signInAnonymously().catch(function(e){ console.warn(e); });
         }
     } catch(e) {
-        console.error("Firebase load fallback:", e);
+        console.warn("Firebase fallback active:", e);
     }
 }
 initFirebase();
 
-// Restore all menu transitions including settings button
-setTimeout(function() { if (document.getElementById("title")) document.getElementById("title").style.transform = "none"; }, 500);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none"; }, 1000);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none"; }, 1200);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[2]) document.getElementsByClassName("menuitem")[2].style.transform = "none"; }, 1400);
-setTimeout(function() { if (document.getElementById("mywebsitelink")) document.getElementById("mywebsitelink").style.transform = "none"; }, 1600);
-setTimeout(function() { if (document.getElementById("settings")) document.getElementById("settings").style.transform = "none"; }, 1800);
-
-function forceScroll() {
-    requestAnimationFrame(forceScroll);
-    window.scrollTo(0, 0);
+// Safe animations (will not break execution if element is missing)
+function safeAnimate(id, delay) {
+    setTimeout(function() {
+        var el = document.getElementById(id);
+        if (el) el.style.transform = "none";
+    }, delay);
 }
-forceScroll();
+safeAnimate("title", 500);
+safeAnimate("mywebsitelink", 1600);
+safeAnimate("settings", 1800);
+
+setTimeout(function() {
+    var items = document.getElementsByClassName("menuitem");
+    if (items[0]) items[0].style.transform = "none";
+    if (items[1]) items[1].style.transform = "none";
+    if (items[2]) items[2].style.transform = "none";
+}, 1000);
 
 var camera, renderer, scene;
 scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 var element = renderer.domElement;
@@ -73,16 +77,17 @@ var wallSegments = [];
 
 var updateColor = function() {
     if (s) {
-        s.style.marginLeft = color / 360 * 80 + "vw";
+        s.style.marginLeft = (color / 360 * 80) + "vw";
         s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
     }
-    document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+    if (document.body) document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
 }
 updateColor();
 
 var menu2 = function() {
-    if (document.getElementById("name") && document.getElementById("name").value !== "") {
-        name = document.getElementById("name").value;
+    var nameInput = document.getElementById("name");
+    if (nameInput && nameInput.value !== "") {
+        name = nameInput.value;
     }
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
@@ -104,8 +109,11 @@ function triggerGameStartUI() {
     gameStarted = true;
     gameSortaStarted = true;
 
-    if (document.getElementsByClassName("info")[0]) document.getElementsByClassName("info")[0].outerHTML = "";
-    if (document.getElementById("startgame")) document.getElementById("startgame").outerHTML = "";
+    var infoBox = document.getElementsByClassName("info")[0];
+    if (infoBox) infoBox.outerHTML = "";
+
+    var startBtn = document.getElementById("startgame");
+    if (startBtn) startBtn.outerHTML = "";
 
     var countDown = document.createElement("DIV");
     countDown.innerHTML = "3";
@@ -158,9 +166,12 @@ var host = function() {
 
 window.codeCheck = function(e) {
     if (e.keyCode === 13) {
-        code = document.getElementById("incode").value.toUpperCase();
-        setupPlayerListeners();
-        triggerGameStartUI();
+        var inputVal = document.getElementById("incode");
+        if (inputVal) {
+            code = inputVal.value.toUpperCase();
+            setupPlayerListeners();
+            triggerGameStartUI();
+        }
     }
 }
 
@@ -205,7 +216,7 @@ function setupPlayerListeners() {
     });
 
     database.ref(code + "/status").on("value", function(v) {
-        if (v.val() == 1) triggerGameStartUI();
+        if (v && v.val() == 1) triggerGameStartUI();
     });
 }
 
@@ -213,8 +224,8 @@ function loadMap() {
     scene.background = new THREE.Color(0x7fb0ff);
     wallSegments = [];
 
-    var trackRaw = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML.trim() : "";
-    if (!trackRaw) trackRaw = OG_TRACK_CODE.trim();
+    var trackElem = document.getElementById("trackcode");
+    var trackRaw = (trackElem && trackElem.innerHTML.trim() !== "") ? trackElem.innerHTML.trim() : OG_TRACK_CODE.trim();
 
     var parts = trackRaw.split("|");
     var racedata = parts[0].trim().split(" ");
@@ -303,7 +314,6 @@ function join() {
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    // Keyboard Steering
     window.addEventListener('keydown', function(e) {
         if (e.key === "ArrowLeft" || e.key === "a") left = true;
         if (e.key === "ArrowRight" || e.key === "d") right = true;
@@ -313,11 +323,12 @@ function join() {
         if (e.key === "ArrowRight" || e.key === "d") right = false;
     });
 
-    // On-screen Touch Steering (Left side / Right side taps)
     window.addEventListener('touchstart', function(e) {
-        var touchX = e.touches[0].clientX;
-        if (touchX < window.innerWidth / 2) left = true;
-        else right = true;
+        if (e.touches && e.touches[0]) {
+            var touchX = e.touches[0].clientX;
+            if (touchX < window.innerWidth / 2) left = true;
+            else right = true;
+        }
     });
     window.addEventListener('touchend', function() {
         left = false;
