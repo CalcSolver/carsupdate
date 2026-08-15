@@ -19,29 +19,33 @@ var playerID = "";
 var playerName = "Player";
 var carColor = 0;
 
-// Initialize Firebase safely without deleting existing instances
+// Initialize Firebase safely
 function initFirebase() {
-    if (db) return; // Already connected
+    if (db) return;
 
-    var existingApp = firebase.apps.find(function(a) { return a.name === 'server0'; });
+    var existingApp = firebase.apps && firebase.apps.find(function(a) { return a.name === 'server0'; });
 
     if (existingApp) {
         app = existingApp;
-    } else {
+    } else if (typeof firebase !== 'undefined') {
         app = firebase.initializeApp(serverList[0], 'server0');
     }
 
-    db = app.database();
-    auth = app.auth();
+    if (app) {
+        db = app.database();
+        auth = app.auth();
 
-    auth.signInAnonymously().catch(function(err) {
-        console.error("Firebase Auth Error:", err);
-    });
+        auth.signInAnonymously().catch(function(err) {
+            console.error("Firebase Auth Error:", err);
+        });
+    }
 }
 
-// Color Picker Functionality
+// Color Picker Drag/Click Handling
 function updateColorFromEvent(e) {
     var picker = document.getElementById("colorpicker");
+    if (!picker) return;
+    
     var rect = picker.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var pct = Math.max(0, Math.min(1, x / rect.width));
@@ -54,27 +58,38 @@ function updateColorFromEvent(e) {
     }
 }
 
-// Menu Navigation
+// Menu Transition: Main Menu -> Lobby Options
 function menu2() {
     var nameInput = document.getElementById("name");
     if (nameInput && nameInput.value.trim() !== "") {
         playerName = nameInput.value.trim();
     }
 
-    // Connect to Firebase when proceeding to lobby setup
     initFirebase();
 
     var fore = document.getElementById("fore");
+    if (!fore) return;
+
     fore.innerHTML = `
         <div id="version">v1.2.0</div>
-        <div class="title">Lobby</div>
-        <div class="menuitem title"><div id="hostbtn" onclick="hostGame()">Host Game</div></div>
+        <div class="title" id="title">Lobby Menu</div>
+        
         <div class="menuitem title">
-            Join Game:<br/>
-            <input id="joincode" class="title" placeholder="CODE" style="text-transform:uppercase;" maxlength="4"><br/>
-            <div id="joinbtn" onclick="joinGame()">Join!</div>
+            <div id="start" onclick="hostGame()">Host Game</div>
         </div>
-        <div id="status" style="margin-top:15px; font-family:'Press Start 2P'; font-size:12px; color:#fff;"></div>
+
+        <div class="menuitem title">
+            Join Room Code:<br/>
+            <input id="joincode" class="title" placeholder="CODE" style="text-transform:uppercase; margin-top:5px;" maxlength="4"><br/>
+            <div id="start" style="margin-top:10px;" onclick="joinGame()">Join Room</div>
+        </div>
+
+        <div id="status" style="margin-top:15px; font-family:'Press Start 2P', cursive; font-size:12px; color:#ffcc00; text-shadow: 1px 1px 2px #000;"></div>
+
+        <div id="toolbar">
+            <div class="tools" id="edit" onclick="window.open('editor/index.html')"></div>
+            <div class="tools" id="help" onclick="window.open('help/index.html')">?</div>
+        </div>
     `;
 }
 
@@ -82,6 +97,12 @@ function menu2() {
 function hostGame() {
     var statusDiv = document.getElementById("status");
     if (statusDiv) statusDiv.innerHTML = "Creating Room...";
+
+    if (!db) {
+        if (statusDiv) statusDiv.innerHTML = "Database connecting... try again in 2s";
+        initFirebase();
+        return;
+    }
 
     roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
     playerID = "p1_" + Math.random().toString(36).substring(2, 6);
@@ -102,7 +123,7 @@ function hostGame() {
         showLobbyUI(true);
         listenForPlayers();
     }).catch(function(err) {
-        if (statusDiv) statusDiv.innerHTML = "Error creating room: " + err.message;
+        if (statusDiv) statusDiv.innerHTML = "Error: " + err.message;
     });
 }
 
@@ -110,10 +131,18 @@ function hostGame() {
 function joinGame() {
     var input = document.getElementById("joincode");
     var statusDiv = document.getElementById("status");
-    if (!input || !input.value) return;
+    if (!input || !input.value) {
+        if (statusDiv) statusDiv.innerHTML = "Enter a 4-letter code!";
+        return;
+    }
 
     var inputCode = input.value.trim().toUpperCase();
     if (statusDiv) statusDiv.innerHTML = "Connecting...";
+
+    if (!db) {
+        initFirebase();
+        return;
+    }
 
     var roomRef = db.ref("rooms/" + inputCode);
     roomRef.once("value").then(function(snapshot) {
@@ -138,21 +167,30 @@ function joinGame() {
     });
 }
 
-// Lobby Waiting UI
+// Render Room UI
 function showLobbyUI(isHost) {
     var fore = document.getElementById("fore");
+    if (!fore) return;
+
     fore.innerHTML = `
         <div id="version">v1.2.0</div>
         <div class="title">Room Code: <span id="code" style="color:#00ff00;">${roomCode}</span></div>
-        <div id="playerlist" style="font-family:'Press Start 2P'; font-size:14px; margin:20px 0; color:#fff;">
-            Waiting for players...
+        
+        <div id="playerlist" style="font-family:'Press Start 2P', cursive; font-size:12px; margin:20px 0; color:#fff; line-height: 1.8;">
+            Connecting to player list...
         </div>
-        ${isHost ? '<div class="menuitem title"><div id="startgame" onclick="startGame()">Start Race!</div></div>' : '<div style="font-family:\'Press Start 2P\'; font-size:12px; color:#aaa;">Waiting for host to start...</div>'}
+
+        ${isHost ? 
+            '<div class="menuitem title"><div id="start" onclick="startGame()">Start Race!</div></div>' : 
+            '<div style="font-family:\'Press Start 2P\', cursive; font-size:10px; color:#aaa; margin-top:10px;">Waiting for host to start...</div>'
+        }
     `;
 }
 
-// Realtime Player Listener
+// Listen for Realtime Lobby Updates
 function listenForPlayers() {
+    if (!db) return;
+
     db.ref("rooms/" + roomCode + "/players").on("value", function(snapshot) {
         var players = snapshot.val();
         var listDiv = document.getElementById("playerlist");
@@ -161,7 +199,7 @@ function listenForPlayers() {
         var html = "";
         Object.keys(players).forEach(function(key) {
             var p = players[key];
-            html += `<div style="margin:5px 0;">• ${p.name} ${p.isHost ? '(Host)' : ''}</div>`;
+            html += `<div style="color: hsl(${p.color}, 100%, 70%);">• ${p.name} ${p.isHost ? '(Host)' : ''}</div>`;
         });
         listDiv.innerHTML = html;
     });
@@ -175,14 +213,14 @@ function listenForPlayers() {
 
 // Start Game Signal
 function startGame() {
-    db.ref("rooms/" + roomCode).update({ status: "playing" });
+    if (db && roomCode) {
+        db.ref("rooms/" + roomCode).update({ status: "playing" });
+    }
 }
 
-// 3D Engine Initialization Placeholder
+// 3D Engine Trigger
 function init3DRace() {
     var fore = document.getElementById("fore");
     if (fore) fore.style.display = "none";
-
-    // Setup Three.js scene here...
-    console.log("Race Started in Room:", roomCode);
+    console.log("Game Start triggered for room:", roomCode);
 }
