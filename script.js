@@ -46,7 +46,7 @@ function initFirebase() {
 }
 initFirebase();
 
-// Restore original title and menu animations
+// Restore original animations
 setTimeout(function() {
     if (document.getElementById("title")) document.getElementById("title").style.transform = "none";
 }, 500);
@@ -81,13 +81,6 @@ scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-
-// Append renderer element to screen body so canvas is always rendered behind UI
-document.body.appendChild(renderer.domElement);
-renderer.domElement.style.position = "fixed";
-renderer.domElement.style.top = "0";
-renderer.domElement.style.left = "0";
-renderer.domElement.style.zIndex = "-1";
 
 var mobile = navigator.userAgent.match("Mobile") != null || navigator.userAgent.match("Linux;") != null;
 var element = renderer.domElement;
@@ -136,7 +129,6 @@ var menu2 = function() {
     }
 }
 
-// Start Game Execution
 window.startGame = function() {
     if (database && code) {
         database.ref(code + "/status").set(1);
@@ -176,6 +168,7 @@ var host = function() {
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
             if (VR) f.innerHTML += "<div id='divider'></div>";
+            f.appendChild(element);
             f.style.transform = "none";
             getCode();
         }, 1000);
@@ -220,6 +213,7 @@ var joinGame = function() {
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
             if (VR) f.innerHTML += "<div id='divider'></div>";
+            f.appendChild(element);
             f.style.transform = "none";
         }, 1000);
     }
@@ -229,10 +223,10 @@ var joinGame = function() {
 function createLocalPlayer() {
     me.data = { x: 0, y: 0, xv: 0, yv: 0, dir: 0, steer: 0, color: color, name: name };
     me.model = new THREE.Mesh(
-        new THREE.BoxBufferGeometry(1.2, 0.8, 2.2),
+        new THREE.BoxBufferGeometry(1, 1, 2),
         new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + color + ", 100%, 50%)")})
     );
-    me.model.position.set(0, 0.4, 0);
+    me.model.position.set(0, 0.6, 0);
     scene.add(me.model);
     players["local"] = me;
 }
@@ -247,10 +241,10 @@ function setupPlayerListeners() {
 
         var playData = p.val();
         var model = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(1.2, 0.8, 2.2),
+            new THREE.BoxBufferGeometry(1, 1, 2),
             new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + (playData.color || 0) + ", 100%, 50%)")})
         );
-        model.position.set(playData.x || 0, 0.4, playData.y || 0);
+        model.position.set(playData.x || 0, 0.6, playData.y || 0);
         scene.add(model);
 
         players[key] = { data: playData, model: model };
@@ -261,47 +255,84 @@ function setupPlayerListeners() {
     });
 }
 
+// Full OG Track Generator Parsing Function
 function loadMap() {
-    // Clear old elements if reloading
     scene.background = new THREE.Color(0x7fb0ff);
 
-    // Main Grass Field
-    var groundGeo = new THREE.PlaneBufferGeometry(2000, 2000);
+    var trackRaw = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML : "";
+    var points = [];
+
+    if (trackRaw && trackRaw.trim() !== "") {
+        var pairs = trackRaw.split(";");
+        for (var i = 0; i < pairs.length; i++) {
+            var coords = pairs[i].split(",");
+            if (coords.length === 2) {
+                points.push({ x: parseFloat(coords[0]) * mapscale, y: parseFloat(coords[1]) * mapscale });
+            }
+        }
+    }
+
+    // Default Track Fallback if trackcode is missing
+    if (points.length === 0) {
+        points = [
+            { x: -50, y: -50 }, { x: 50, y: -50 },
+            { x: 50, y: 50 }, { x: -50, y: 50 }
+        ];
+    }
+
+    // Ground Grass Plane
+    var groundGeo = new THREE.PlaneBufferGeometry(1000, 1000);
     var groundMat = new THREE.MeshLambertMaterial({ color: 0x57c115 });
     var ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     scene.add(ground);
 
-    // Track Asphalt Road Loops & Outer Barriers
-    var roadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
-    var wallMat = new THREE.MeshLambertMaterial({ color: 0xdd4433 });
+    // Build Original Walls & Road Segments
+    var wallMat = new THREE.MeshLambertMaterial({ color: 0xf48342 });
+    var roadMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
 
-    // Inner Track Oval
-    var roadTrack = new THREE.Mesh(new THREE.RingBufferGeometry(30, 60, 32), roadMat);
-    roadTrack.rotation.x = -Math.PI / 2;
-    roadTrack.position.y = 0.01;
-    scene.add(roadTrack);
+    for (var i = 0; i < points.length; i++) {
+        var p1 = points[i];
+        var p2 = points[(i + 1) % points.length];
 
-    // Track Guard Rails / Boundary Walls
-    var outerWall = new THREE.Mesh(new THREE.CylinderBufferGeometry(61, 61, 2, 32, 1, true), wallMat);
-    outerWall.position.y = 1;
-    scene.add(outerWall);
+        var dx = p2.x - p1.x;
+        var dy = p2.y - p1.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var angle = Math.atan2(dx, dy);
 
-    var innerWall = new THREE.Mesh(new THREE.CylinderBufferGeometry(29, 29, 2, 32, 1, true), wallMat);
-    innerWall.position.y = 1;
-    scene.add(innerWall);
+        // Asphalt Road Track Segment
+        var roadGeo = new THREE.PlaneBufferGeometry(12, dist);
+        var road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.rotation.z = -angle;
+        road.position.set((p1.x + p2.x) / 2, 0.01, (p1.y + p2.y) / 2);
+        scene.add(road);
+
+        // Track Side Guard Rails
+        var wallGeo = new THREE.BoxBufferGeometry(WALL_SIZE, 2, dist);
+        
+        var leftWall = new THREE.Mesh(wallGeo, wallMat);
+        leftWall.position.set((p1.x + p2.x) / 2 - Math.cos(angle) * 6, 1, (p1.y + p2.y) / 2 + Math.sin(angle) * 6);
+        leftWall.rotation.y = angle;
+        scene.add(leftWall);
+
+        var rightWall = new THREE.Mesh(wallGeo, wallMat);
+        rightWall.position.set((p1.x + p2.x) / 2 + Math.cos(angle) * 6, 1, (p1.y + p2.y) / 2 - Math.sin(angle) * 6);
+        rightWall.rotation.y = angle;
+        scene.add(rightWall);
+    }
 }
 
 function join() {
     loadMap();
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 5, 10);
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 3, 10);
     scene.add(camera);
 
-    var light = new THREE.DirectionalLight(0xffffff, 0.8);
-    light.position.set(100, 200, 100);
+    var light = new THREE.DirectionalLight(0xffffff, 0.7);
+    light.position.set(3000, 2000, -2000);
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
@@ -342,9 +373,9 @@ function join() {
                 me.model.rotation.y = me.data.dir;
             }
 
-            camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 8;
-            camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 8;
-            camera.position.y = me.model.position.y + 4;
+            camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
+            camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
+            camera.position.y = me.model.position.y + 3;
             camera.lookAt(me.model.position);
         }
 
