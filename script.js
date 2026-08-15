@@ -1,4 +1,4 @@
-var SPEED = 0.004;
+var SPEED = 0.008;
 var CAMERA_LAG = 0.9;
 var COLLISION = 1.1;
 var BOUNCE = 0.7;
@@ -6,612 +6,431 @@ var mapscale = 5;
 var VR = false;
 var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
-var MOUNTAIN_DIST = 250;
-var OOB_DIST = 200;
-var LAPS = 3;
-function MODS(){
+var LAPS = 5;
 
-}
+// Complete OG Track Code String
+var OG_TRACK_CODE = "1,5/0,7 0,7/-1,8 -1,8/-3,9 -3,9/-7,9 -7,9/-9,8 -9,8/-10,7 -10,7/-11,5 -6,7/-4,7 -4,7/-2,6 -2,6/-1,4 -6,7/-8,6 -8,6/-9,4 -1,4/-1,0 1,0/1,5 -11,5/-11,0 -11,0/-10,-1 -10,-1/-8,-1 -8,-1/-7,0 -7,0/-7,2 -9,3/-8,4 -8,4/-6,4 -6,4/-5,3 -5,3/-5,1 -9,1/-9,4 -5,3/-4,4 -4,4/-2,4 -2,4/-1,3 -7,0/-6,-1 -6,-1/-4,-1 -4,-1/-3,0 -3,0/-3,2 -1,0/-1,-2 -1,-2/0,-4 0,-4/2,-5 2,-5/4,-5 4,-5/6,-4 6,-4/7,-2 -3,0/-3,-3 -3,-3/-2,-5 -2,-5/-1,-6 -1,-6/1,-7 1,-7/5,-7 5,-7/7,-6 7,-6/8,-5 8,-5/9,-3 9,-3/9,2 9,2/8,4 8,4/6,5 6,5/4,5 4,5/2,4 2,4/1,2 7,-2/7,2 7,2/6,3 6,3/4,3 4,3/3,2 4,-3/2,-3 2,-3/1,-2 1,-2/1,0 4,-3/5,-2 5,-2/5,1 3,2/3,-1 |-1,3/1,3 6,-4/7,-6 |-7,5 -5,6 -4,5 2,6 1,8 3,9 4,6 3,7 -3,10 -4,12 -10,11 -12,8 -14,8 -12,6 -7,10 -12,2 -15,3 -13,-1 -10,-4 -8,-2 -6,-4 -4,-3 -11,-2 -8,-3 -4,-5 -3,-6 -5,-2 0,-8 -2,-8 -4,-8 -5,-6 -3,-10 2,-9 4,-8 5,-10 6,-8 10,-7 8,-7 9,-11 9,-5 15,-4 11,-2 11,-1 10,3 16,2 12,1 8,6 7,9 6,6 -8,-7 -13,-7 -13,-4 -15,-4 -17,0 |1,3,6/22 0,3,8/55 -2,3,9/77 -8,3,9/115 -10,3,8/148 -11,3,6/166 -8,3,4/-86 -7,3,4/-83 -6,3,4/-90 -10,3,-1/-83 -9,3,-1/-88 -8,3,-1/-90 -6,3,-1/-89 -5,3,-1/-89 -4,3,-1/-89 -4,3,4/-90 -3,3,4/-90 -2,3,4/265 -3,3,-4/194 -2,3,-6/218 0,3,-7/262 6,3,-7/-69 8,3,-6/-42 9,3,-4/-16 9,3,4/40 8,3,5/70 2,3,5/135 3,3,6/122 |";
 
-// Updated with your single Firebase project config
 var serverList = [
     {
-        apiKey: "AIzaSyDiJsMLlix5o9XqPW1EpeBvuA15XNjlR8M",
-        authDomain: "car-game-a86b9.firebaseapp.com",
-        databaseURL: "https://car-game-a86b9.firebaseio.com",
-        projectId: "car-game-a86b9",
-        storageBucket: "car-game-a86b9.appspot.com",
-        messagingSenderId: "722396856191",
-        appId: "1:722396856191:web:fb5f72917856108a50e44a"
+        apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
+        authDomain: "racing-game-67477.firebaseapp.com",
+        databaseURL: "https://racing-game-67477-default-rtdb.firebaseio.com",
+        projectId: "racing-game-67477",
+        storageBucket: "racing-game-67477.firebasestorage.app",
+        messagingSenderId: "48596697348",
+        appId: "1:48596697348:web:897b9f78e511bc2f635051"
     }
 ];
 
-var database, connectedN = -1, connectedS = undefined;
-for(var i = 0; i < serverList.length; i++){
-    firebase.initializeApp(serverList[i], "server" + i);
-    let li = i;
-    let la = firebase.apps[i];
-    if(i == 0){
-        try{
-            la.analytics();
-        }catch{}
+var database = null;
+
+function initFirebase() {
+    if (database) return;
+    try {
+        var app;
+        var existingApp = typeof firebase !== 'undefined' && firebase.apps && firebase.apps.find(function(a) { return a.name === 'server0'; });
+        if (existingApp) {
+            app = existingApp;
+        } else if (typeof firebase !== 'undefined') {
+            app = firebase.initializeApp(serverList[0], "server0");
+        }
+        if (app) {
+            database = app.database();
+            app.auth().signInAnonymously().catch(function(e){ console.warn(e); });
+        }
+    } catch(e) {
+        console.warn("Firebase running in offline/local mode:", e);
     }
-    let tm = setTimeout(function(){
-        la.delete();
-    }, 5000);
-    la.auth().signInAnonymously().then(() => {
-        database = la.database();
-        database.ref("/testServer").once("value", function(e){
-            clearTimeout(tm);
-            if(connectedN >= 0 && connectedN > li)
-                connectedS.delete();
-            if(connectedN < 0 || connectedN > li){
-                database = la.database();
-                connectedN = li;
-                connectedS = la;
-            }else{
-                la.delete();
-            }
-        }, function(e){
-            la.delete();
-        });
-    }, function(e){
-        la.delete();
-    });
 }
+initFirebase();
 
-setTimeout(function(){
-    document.getElementById("title").style.transform = "none";
-}, 500);
-setTimeout(function(){
-    document.getElementsByClassName("menuitem")[0].style.transform = "none";
+// Menu Animations
+function animateElement(id, delay) {
+    setTimeout(function() {
+        var el = document.getElementById(id);
+        if (el) el.style.transform = "none";
+    }, delay);
+}
+animateElement("title", 500);
+animateElement("mywebsitelink", 1600);
+animateElement("settings", 1800);
+
+setTimeout(function() {
+    var items = document.getElementsByClassName("menuitem");
+    if (items[0]) items[0].style.transform = "none";
+    if (items[1]) items[1].style.transform = "none";
+    if (items[2]) items[2].style.transform = "none";
 }, 1000);
-setTimeout(function(){
-    document.getElementsByClassName("menuitem")[1].style.transform = "none";
-}, 1200);
-setTimeout(function(){
-    document.getElementsByClassName("menuitem")[2].style.transform = "none";
-}, 1400);
-setTimeout(function(){
-    document.getElementById("mywebsitelink").style.transform = "none";
-}, 1600);
-setTimeout(function(){
-    document.getElementById("settings").style.transform = "none";
-}, 1800);
 
-if(top != self) {
-    document.getElementById("warning").style.display = "block";
-}
-
-function forceScroll(){
+function forceScroll() {
     requestAnimationFrame(forceScroll);
     window.scrollTo(0, 0);
 }
 forceScroll();
 
-var camera, renderer, scene, renderer2, scene2, labels = [];
+// Scene & Renderer Setup
+var camera, renderer, scene;
 scene = new THREE.Scene();
-renderer = new THREE.WebGLRenderer();
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
-var mobile = navigator.userAgent.match("Mobile")!=null||navigator.userAgent.match("Linux;")!=null;
-if(!mobile){
-    renderer.shadowMap.enabled = false;
-    renderer.shadowMap.autoUpdate = false;
-    renderer.shadowMap.needsUpdate = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    document.getElementById("cardboard").className += " disabled";
-    console.log(mobile);
-}
+
+// Ensure the game canvas sits behind the menu foreground overlay
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.width = "100vw";
+renderer.domElement.style.height = "100vh";
+renderer.domElement.style.zIndex = "1";
+
 var element = renderer.domElement;
-
-function toggleFullScreen() {
-    var doc = window.document;
-    var docEl = doc.documentElement;
-
-    var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
-    var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
-
-    if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
-        requestFullScreen.call(docEl);
-    }
-    else {
-        cancelFullScreen.call(doc);
-    }
-    window.scrollTo(0,1);
-}
-
-var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
-var carPos = [
-    {x: 0, y: 0},
-    {x: 2, y: 0},
-    {x: -2, y: 0},
-    {x: 0, y: -3},
-    {x: -2, y: -3},
-    {x: 2, y: -3},
-    {x: 0, y: -6},
-    {x: 2, y: -6},
-    {x: -2, y: -6},
-    {x: 0, y: -9},
-    {x: 2, y: -9},
-    {x: -2, y: -9},
-    {x: 0, y: -12},
-    {x: -2, y: -12},
-    {x: 2, y: -12},
-    {x: 0, y: -15},
-    {x: 2, y: -15},
-    {x: -2, y: -15}
-];
-color = Math.floor(Math.random() * 360);
+var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
+var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
 var s = document.getElementById("slider");
-updateColor = function(){
-    s.style.marginLeft = color / 360 * 80 + "vw";
-    s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
-    document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+var wallSegments = [];
+
+var updateColor = function() {
+    if (s) {
+        s.style.marginLeft = (color / 360 * 80) + "vw";
+        s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
+    }
+    if (document.body) {
+        document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+    }
 }
 updateColor();
 
-menu2 = function(){
-    if(mobile){
-        function reactOrientation(e){
-            var angle = screen.orientation.type == "portrait-primary" ? e.gamma : screen.orientation.type == "portrait-secondary" ? -e.gamma : screen.orientation.type == "landscape-primary" ? e.beta : screen.orientation.type == "landscape-secondary" ? -e.beta : 0;
-            me.data.steer = Math.max(Math.min((-angle) / 180 * Math.PI, Math.PI / 6), -Math.PI / 6);
-        }
+// Color Slider Drag Logic
+var draggingSlider = false;
+if (s) {
+    var startDrag = function() { draggingSlider = true; };
+    var stopDrag = function() { draggingSlider = false; };
+    var moveDrag = function(e) {
+        if (!draggingSlider) return;
+        var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        color = Math.max(0, Math.min(360, Math.floor((clientX / window.innerWidth) * 360)));
+        updateColor();
+    };
+    s.addEventListener("mousedown", startDrag);
+    s.addEventListener("touchstart", startDrag);
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("touchend", stopDrag);
+    window.addEventListener("mousemove", moveDrag);
+    window.addEventListener("touchmove", moveDrag);
+}
 
-        if(DeviceOrientationEvent.requestPermission){
-            DeviceOrientationEvent.requestPermission("The game needs to access phone tilt so you can steer your car.").then(permissionState => {
-                if (permissionState === 'granted')
-                    window.addEventListener('deviceorientation', reactOrientation);
-                else
-                    alert("Permission denied");
-            }).catch(alert);
-            }else{
-            window.addEventListener('deviceorientation', reactOrientation);
-        }
+window.menu2 = function() {
+    var nameInput = document.getElementById("name");
+    if (nameInput && nameInput.value !== "") {
+        name = nameInput.value;
     }
-    if(document.getElementById("name").value == "")
-        name = "Nerd with No Name";
-    else
-        name = document.getElementById("name").value;
-    VR = document.getElementById("cardboard").className == "tools sel";
-    f.style.transform = "translate3d(0, -100vh, 0)";
-    setTimeout(function(){
-        f.innerHTML = "<div class='menuitem title button' id='host' ontouchstart='this.click()' onclick='host()'>Host a game</div><div class='menuitem title button' ontouchstart='this.click()' id='join' onclick='joinGame()'>Join a game</div>";
-        f.style.transform = "none";
-        setTimeout(function(){
-            document.getElementById("host").style.transform = "none";
-            setTimeout(function(){
-                document.getElementById("host").style.transition = "transform .2s, box-shadow .2s";
-            }, 500);
+    if (f) {
+        f.style.transform = "translate3d(0, -100vh, 0)";
+        setTimeout(function() {
+            f.innerHTML = "<div class='menuitem title button' id='host' ontouchstart='host()' onclick='host()'>Host a game</div><div class='menuitem title button' id='join' ontouchstart='joinGame()' onclick='joinGame()'>Join a game</div>";
+            f.style.transform = "none";
         }, 500);
-        setTimeout(function(){
-            document.getElementById("join").style.transform = "none";
-            setTimeout(function(){
-                document.getElementById("join").style.transition = "transform .2s, box-shadow .2s";
-            }, 500);
-        }, 1000);
-    }, 500);
+    }
 }
 
-host = function(){
-    document.getElementById("host").onclick = null;
-    f.style.transform = "translate3d(0, -100vh, 0)";
-    setTimeout(function(){
-        f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
-        if(VR)
-            f.innerHTML += "<div id='divider'></div>";
-        f.appendChild(element);
-        f.style.transform = "none";
-        getCode();
-    }, 1000);
+window.startGame = function() {
+    if (database && code) {
+        database.ref(code + "/status").set(1);
+    }
+    triggerGameStartUI();
+}
 
-    function getCode(){
-        code = "";
-        var letters = "ABCDEFGHIJKLMMNOPQRSTUVWXYZ";
-        for(var i = 0; i < 4; i++)
-            code += letters[Math.floor(Math.random() * letters.length)];
-        database.ref(code).once("value", function(codeCheck){
-            console.log(codeCheck.val());
-            if(codeCheck.val() == null || codeCheck.val().status == -1 || !codeCheck.val().timestamp || Date.now() - codeCheck.val().timestamp > 1000 * 60 * 60 * 24){
-                console.log(code);
-                document.getElementById("code").innerHTML = code;
+function triggerGameStartUI() {
+    gameStarted = true;
+    gameSortaStarted = true;
 
-                database.ref(code).set({
-                    status: 0,
-                    players: {},
-                    map: document.getElementById("trackcode").innerHTML,
-                    timestamp: Date.now()
-                });
+    var infoBox = document.getElementsByClassName("info")[0];
+    if (infoBox) infoBox.outerHTML = "";
 
-                database.ref(code + "/players").on("child_added", function(p){
-                    console.log(p);
-                    players[p.ref_.path.pieces_[2]] = {
-                        data: p.val(),
-                        model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
-                    };
-                    var pl = players[p.ref_.path.pieces_[2]];
-                    pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-                    pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
-                    var wheel = new THREE.Mesh(
-                        new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
-                        new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
-                    );
-                    var w1 = wheel.clone();
-                    w1.position.set(0.6, -0.1, 0.7);
-                    w1.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w1);
-                    var w2 = wheel.clone();
-                    w2.position.set(-0.6, -0.1, 0.7);
-                    w2.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w2);
-                    var w3 = wheel.clone();
-                    w3.position.set(0.6, -0.1, -0.7);
-                    w3.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w3);
-                    var w4 = wheel.clone();
-                    w4.position.set(-0.6, -0.1, -0.7);
-                    w4.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-                    pl.model.add(w4);
-                    var label = document.createElement("DIV");
-                    label.className = "label";
-                    label.innerHTML = pl.data.name.replaceAll("<", "&lt;") + "<br/>|";
-                    pl.label = label;
-                    label.position = pl.model.position;
-                    console.log(label);
-                    f.appendChild(label);
-                    labels.push(label);
-                    pl.model.receiveShadow = true;
-                    scene.add(pl.model);
+    var startBtn = document.getElementById("startgame");
+    if (startBtn) startBtn.outerHTML = "";
 
-                    if(p.ref_.path.pieces_[2] == me.ref.path.pieces_[2]){
-                        me.label = pl.label;
-                        me.model = pl.model;
-                        me.label.innerHTML = "";
-                    }
-                });
+    var countDown = document.createElement("DIV");
+    countDown.innerHTML = "3";
+    countDown.className = "title";
+    countDown.id = "countdown";
+    if (f) f.appendChild(countDown);
 
-                database.ref(code + "/players").on("child_changed", function(p){
-                    players[p.ref_.path.pieces_[2]].data = p.val();
-                });
+    lap = document.createElement("DIV");
+    lap.innerHTML = "1/" + LAPS;
+    lap.className = "title";
+    lap.id = "lap";
+    if (f) f.appendChild(lap);
 
-                me.ref = database.ref(code + "/players").push();
-                me.data = {
-                    x: 0,
-                    y: 0,
-                    xv: 0,
-                    yv: 0,
-                    dir: 0,
-                    steer: 0,
-                    color: color,
-                    name: name,
-                    checkpoint: 1,
-                    lap: 0,
-                    collision: {}
-                }
-                me.ref.set(me.data);
+    setTimeout(function() { if (countDown) countDown.innerHTML = "2"; }, 1000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = "1"; }, 2000);
+    setTimeout(function() { 
+        if (countDown) countDown.innerHTML = "GO!"; 
+        gameSortaStarted = false;
+    }, 3000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = ""; }, 4000);
+}
 
-                database.ref(code + "/status").on("value", function(v){
-                    v = v.val();
-                    if(v == 1){
-                        document.getElementsByClassName("info")[0].outerHTML = "";
-                        document.getElementById("startgame").outerHTML = "";
-
-                        gameStarted = true;
-                        gameSortaStarted = true;
-
-                        var countDown = document.createElement("DIV");
-                        countDown.innerHTML = "3";
-                        countDown.className = "title";
-                        countDown.id = "countdown";
-                        f.appendChild(countDown);
-
-                        lap = document.createElement("DIV");
-                        lap.innerHTML = "1/" + LAPS;
-                        lap.className = "title";
-                        lap.id = "lap";
-                        f.appendChild(lap);
-
-                        setTimeout(function(){
-                            countDown.innerHTML = "2";
-                        }, 1000);
-
-                        setTimeout(function(){
-                            countDown.innerHTML = "1";
-                        }, 2000);
-
-                        setTimeout(function(){
-                            countDown.innerHTML = "GO!";
-                            gameSortaStarted = false;
-                        }, 3000);
-
-                        setTimeout(function(){
-                            countDown.innerHTML = "";
-                        }, 4000);
-                    }
-                });
-            }else
-                getCode();
-        });
+window.host = function() {
+    if (f) {
+        f.style.transform = "translate3d(0, -100vh, 0)";
+        setTimeout(function() {
+            f.innerHTML = "<div class='info title'>Use this code to join!<div id='code'>Loading...</div></div><div id='startgame' class='title' ontouchstart='startGame()' onclick='startGame()'>Start!</div>";
+            f.style.transform = "none";
+            getCode();
+        }, 1000);
     }
 
+    function getCode() {
+        code = "";
+        var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (var i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+        var codeDisplay = document.getElementById("code");
+        if (codeDisplay) codeDisplay.innerHTML = code;
+
+        if (database) {
+            database.ref(code).set({ status: 0, players: {}, timestamp: Date.now() });
+            setupPlayerListeners();
+        } else {
+            createLocalPlayer();
+        }
+    }
     join();
 }
 
-joinGame = function(){
-    document.getElementById("join").onclick = null;
-    f.style.transform = "translate3d(0, -100vh, 0)";
-    setTimeout(function(){
-        f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
-        if(VR)
-            f.innerHTML += "<div id='divider'></div>";
-        f.appendChild(element);
-        f.style.transform = "none";
-    }, 1000);
+window.codeCheck = function(e) {
+    if (e.keyCode === 13) {
+        var inputVal = document.getElementById("incode");
+        if (inputVal) {
+            code = inputVal.value.toUpperCase();
+            setupPlayerListeners();
+            triggerGameStartUI();
+        }
+    }
+}
+
+window.joinGame = function() {
+    if (f) {
+        f.style.transform = "translate3d(0, -100vh, 0)";
+        setTimeout(function() {
+            f.innerHTML = "<div class='info title'>Enter Code:<input id='incode' class='title' onkeyup='codeCheck(event)'></input></div>";
+            f.style.transform = "none";
+        }, 1000);
+    }
     join();
 }
 
-var map, trees, signs, startc, main;
-
-function deleteMap(){
-    while(map.children.length > 0)
-        map.remove(map.children[0]);
-    scene.remove(map);
-    while(trees.children.length > 0)
-        trees.remove(trees.children[0]);
-    scene.remove(trees);
-    while(signs.children.length > 0)
-        signs.remove(signs.children[0]);
-    scene.remove(signs);
-    while(startc.children.length > 0)
-        startc.remove(startc.children[0]);
-    scene.remove(startc);
-    while(main.children.length > 0)
-        main.remove(main.children[0]);
-    scene.remove(main);
+function createLocalPlayer() {
+    me.data = { x: 0, y: 0, xv: 0, yv: 0, dir: 0, steer: 0, color: color, name: name };
+    me.model = new THREE.Mesh(
+        new THREE.BoxBufferGeometry(1, 1, 2),
+        new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + color + ", 100%, 50%)")})
+    );
+    me.model.position.set(0, 0.6, 0);
+    scene.add(me.model);
+    players["local"] = me;
 }
 
-function loadMap(){
-    var racedata = document.getElementById("trackcode").innerHTML.trim().split("|")[0].trim().split(" ");
-    var material = new THREE.MeshLambertMaterial({color: new THREE.Color(0xf48342)});
-    map = new THREE.Object3D();
-    for(var i = 0; i < racedata.length; i++){
-        if(racedata[i] == "")
-            continue;
-        var point1 = new THREE.Vector2(parseInt(racedata[i].split("/")[0].split(",")[0]), parseInt(racedata[i].split("/")[0].split(",")[1]));
-        var point2 = new THREE.Vector2(parseInt(racedata[i].split("/")[1].split(",")[0]), parseInt(racedata[i].split("/")[1].split(",")[1]));
+function setupPlayerListeners() {
+    createLocalPlayer();
+    if (!database || !code) return;
+
+    database.ref(code + "/players").on("child_added", function(p) {
+        var key = p.key;
+        if (players[key]) return;
+        var playData = p.val();
+        var model = new THREE.Mesh(
+            new THREE.BoxBufferGeometry(1, 1, 2),
+            new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + (playData.color || 0) + ", 100%, 50%)")})
+        );
+        model.position.set(playData.x || 0, 0.6, playData.y || 0);
+        scene.add(model);
+        players[key] = { data: playData, model: model };
+    });
+
+    database.ref(code + "/players").on("child_changed", function(p) {
+        var key = p.key;
+        if (players[key] && key !== me.key) {
+            var val = p.val();
+            players[key].model.position.x = val.x;
+            players[key].model.position.z = val.y;
+            players[key].model.rotation.y = val.dir;
+        }
+    });
+
+    database.ref(code + "/status").on("value", function(v) {
+        if (v && v.val() == 1) triggerGameStartUI();
+    });
+}
+
+function loadMap() {
+    scene.background = new THREE.Color(0x7fb0ff);
+    wallSegments = [];
+
+    var trackElem = document.getElementById("trackcode");
+    var trackRaw = (trackElem && trackElem.innerHTML.trim() !== "") ? trackElem.innerHTML.trim() : OG_TRACK_CODE.trim();
+
+    var parts = trackRaw.split("|");
+    var racedata = parts[0].trim().split(" ");
+    var material = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xf48342) });
+
+    var mapObj = new THREE.Object3D();
+
+    for (var i = 0; i < racedata.length; i++) {
+        if (racedata[i] == "" || !racedata[i].includes("/")) continue;
+        var p1 = racedata[i].split("/")[0].split(",");
+        var p2 = racedata[i].split("/")[1].split(",");
+        
+        var x1 = -parseFloat(p1[0]) * mapscale;
+        var z1 = parseFloat(p1[1]) * mapscale;
+        var x2 = -parseFloat(p2[0]) * mapscale;
+        var z2 = parseFloat(p2[1]) * mapscale;
+
+        var dx = x2 - x1;
+        var dz = z2 - z1;
+        var dist = Math.sqrt(dx * dx + dz * dz);
+        var angle = Math.atan2(dx, dz);
+
         var wall = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(point1.distanceTo(point2) * mapscale + 0.3, 1.5, 0.3),
+            new THREE.BoxBufferGeometry(0.3, 1.5, dist + 0.3),
             material
         );
-        var angle = Math.atan2((point1.y - point2.y), (point1.x - point2.x));
-        wall.position.set(-(point1.x + point2.x) / 2 * mapscale, 0.75, (point1.y + point2.y) / 2 * mapscale);
-        wall.rotation.set(0, angle, 0, "YXZ");
-        var plane = new THREE.Plane(new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle));
-        wall.plane = plane;
-        wall.width = point1.distanceTo(point2) * mapscale;
-        wall.p1 = point1.multiply(new THREE.Vector2(-mapscale, mapscale));
-        wall.p2 = point2.multiply(new THREE.Vector2(-mapscale, mapscale));
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        map.add(wall);
+        wall.position.set((x1 + x2) / 2, 0.75, (z1 + z2) / 2);
+        wall.rotation.y = angle;
+        mapObj.add(wall);
+
+        wallSegments.push({ x1: x1, z1: z1, x2: x2, z2: z2 });
     }
-    scene.add(map);
+    scene.add(mapObj);
 
-    trees = new THREE.Object3D();
-    var tree = new THREE.Mesh(
-        new THREE.CylinderBufferGeometry(0, 4, 15),
-        new THREE.MeshLambertMaterial({color: new THREE.Color("#1bad2c")})
-    );
-    var treedata = document.getElementById("trackcode").innerHTML.trim().split("|")[2].trim().split(" ");
-    for(var i = 0; i < treedata.length; i++){
-        if(treedata[i] == "")
-            continue;
-        var t = tree.clone();
-        t.position.set(-parseInt(treedata[i].split(",")[0]) * mapscale, 0, parseInt(treedata[i].split(",")[1]) * mapscale);
-        var s = Math.random() + 1;
-        t.scale.set(s, s, s);
-        t.castShadow = true;
-        t.receiveShadow = true;
-        trees.add(t);
-    }
-    scene.add(trees);
-
-    signs = new THREE.Object3D();
-    var sign = new THREE.Mesh(
-        new THREE.ConeBufferGeometry(0.7, 2, 5),
-        new THREE.MeshLambertMaterial({color: new THREE.Color("#f00")})
-    );
-    var signdata = document.getElementById("trackcode").innerHTML.trim().split("|")[3].trim().split(" ");
-    for(var i = 0; i < signdata.length; i++){
-        if(signdata[i] == "")
-            continue;
-        var s = sign.clone();
-        var da = signdata[i].split("/");
-        s.position.set(-parseFloat(da[0].split(",")[0]) * mapscale, parseFloat(da[0].split(",")[1]) + 1, parseFloat(da[0].split(",")[2]) * mapscale);
-        s.rotation.set(Math.PI / 2, parseInt(da[1]) / 180 * Math.PI, 0, "YXZ");
-        s.castShadow = true;
-        s.receiveShadow = true;
-        signs.add(s);
-    }
-    scene.add(signs);
-
-    var startdata = document.getElementById("trackcode").innerHTML.trim().split("|")[1].trim().split(" ");
-    startc = new THREE.Object3D();
-    for(var i = 0; i < startdata.length; i++){
-        if(startdata[i] == "")
-            continue;
-        var point1 = new THREE.Vector2(parseInt(startdata[i].split("/")[0].split(",")[0]), parseInt(startdata[i].split("/")[0].split(",")[1]));
-        var point2 = new THREE.Vector2(parseInt(startdata[i].split("/")[1].split(",")[0]), parseInt(startdata[i].split("/")[1].split(",")[1]));
-        var wall = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(point1.distanceTo(point2) * mapscale, 0.1, 1),
-            new THREE.MeshLambertMaterial({color: new THREE.Color(i == 0 ? "#2580db" : "#db2525")})
-        );
-        var angle = Math.atan2((point1.y - point2.y), (point1.x - point2.x));
-        wall.position.set(-(point1.x + point2.x) / 2 * mapscale, 0, (point1.y + point2.y) / 2 * mapscale);
-        wall.rotation.set(0, angle, 0, "YXZ");
-        var plane = new THREE.Plane(new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle));
-        wall.plane = plane;
-        wall.width = point1.distanceTo(point2) * mapscale;
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        startc.add(wall);
-    }
-    scene.add(startc);
-
-    main = new THREE.Object3D();
-
-    var stripes = new THREE.TextureLoader().load("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEklEQVQYV2NgYGD4z/D/////AA/6BPwHejn9AAAAAElFTkSuQmCC");
-    stripes.magFilter = THREE.NearestFilter;
-    stripes.wrapS = THREE.RepeatWrapping;
-    stripes.wrapT = THREE.RepeatWrapping;
-    stripes.repeat.set(100, 100);
     var ground = new THREE.Mesh(
-        new THREE.PlaneBufferGeometry(1000, 1000),
-        new THREE.MeshLambertMaterial({color: new THREE.Color(0x57c115), emissive: new THREE.Color(0x0f0f0f), emissiveMap: stripes})
+        new THREE.PlaneBufferGeometry(2000, 2000),
+        new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
     );
     ground.rotation.set(-Math.PI / 2, 0, 0);
-    ground.receiveShadow = true;
-    main.add(ground);
-
-    for(var i = 0; i < 100; i++){
-        var cube = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(100, 100, 100),
-            new THREE.MeshLambertMaterial({color: new THREE.Color("#888"), side: THREE.DoubleSide})
-        );
-        var dist = Math.random() * MOUNTAIN_DIST + MOUNTAIN_DIST;
-        var dir = Math.random() * Math.PI * 2;
-        cube.position.set(dist * Math.sin(dir), 0, dist * Math.cos(dir));
-        cube.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
-        main.add(cube);
-    }
-    scene.add(main);
-
-    return document.getElementById("trackcode").innerText.trim().split("|")[4];
+    scene.add(ground);
 }
 
-function join(){
-    eval(loadMap());
+function checkWallCollisions(player) {
+    var px = player.x;
+    var pz = player.y;
+    var carRadius = 0.8;
 
-    scene.background = new THREE.Color(0x7fb0ff);
+    for (var i = 0; i < wallSegments.length; i++) {
+        var w = wallSegments[i];
+        
+        var l2 = (w.x2 - w.x1) * (w.x2 - w.x1) + (w.z2 - w.z1) * (w.z2 - w.z1);
+        if (l2 === 0) continue;
+        var t = ((px - w.x1) * (w.x2 - w.x1) + (pz - w.z1) * (w.z2 - w.z1)) / l2;
+        t = Math.max(0, Math.min(1, t));
 
-    camera = new THREE.PerspectiveCamera(
-        90,
-        window.innerWidth / window.innerHeight,
-        1,
-        1000
-    );
+        var nearestX = w.x1 + t * (w.x2 - w.x1);
+        var nearestZ = w.z1 + t * (w.z2 - w.z1);
 
+        var distX = px - nearestX;
+        var distZ = pz - nearestZ;
+        var distance = Math.sqrt(distX * distX + distZ * distZ);
+
+        if (distance < carRadius) {
+            var overlap = carRadius - distance;
+            var nx = distX / (distance || 1);
+            var nz = distZ / (distance || 1);
+
+            player.x += nx * overlap;
+            player.y += nz * overlap;
+
+            player.xv *= -BOUNCE;
+            player.yv *= -BOUNCE;
+        }
+    }
+}
+
+function join() {
+    if (!document.body.contains(element)) {
+        document.body.appendChild(element);
+    }
+
+    loadMap();
+
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 3, 10);
     scene.add(camera);
 
-    var player = new THREE.Object3D();
-    player.position.set(0, 0, 0);
-
-    camera.lookAt(player.position);
-
-    scene.add(player);
-
     var light = new THREE.DirectionalLight(0xffffff, 0.7);
     light.position.set(3000, 2000, -2000);
-    light.castShadow = true;
-    light.shadow.mapSize.width = 2048;
-    light.shadow.mapSize.height = 2048;
-    light.shadow.camera.near = 3000;
-    light.shadow.camera.far = 5000;
-    light.shadow.camera.top = 100;
-    light.shadow.camera.bottom = -100;
-    light.shadow.camera.left = -100;
-    light.shadow.camera.right = 120;
-    light.shadow.bias = 0.00002;
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    var x = 0;
-    var ray = new THREE.Raycaster();
-    function toXYCoords(pos){
-        pos = pos.clone();
-        pos.y += 0.5;
-        var vector = pos.project(camera);
-        vector.x = (vector.x + 1) / 2 * window.innerWidth;
-        vector.y = -(vector.y - 1) / 2 * window.innerHeight;
-        return vector;
-    }
-    var windowsize = {x: window.innerWidth, y: window.innerHeight};
+    window.addEventListener('keydown', function(e) {
+        if (e.key === "ArrowLeft" || e.key === "a") left = true;
+        if (e.key === "ArrowRight" || e.key === "d") right = true;
+    });
+    window.addEventListener('keyup', function(e) {
+        if (e.key === "ArrowLeft" || e.key === "a") left = false;
+        if (e.key === "ArrowRight" || e.key === "d") right = false;
+    });
 
-    var ray = new THREE.Raycaster();
-    ray.near = 0;
-    ray.far = 1;
-
-    var ren = renderer;
-    var controls;
-    if(VR){
-        var effect = new THREE.StereoEffect(renderer);
-        effect.setSize(window.innerWidth, window.innerHeight);
-        effect.setEyeSeparation(0.7);
-        ren = effect;
-        controls = new THREE.DeviceOrientationControls(camera);
-    }
+    window.addEventListener('touchstart', function(e) {
+        if (e.touches && e.touches[0]) {
+            var touchX = e.touches[0].clientX;
+            if (touchX < window.innerWidth / 2) left = true;
+            else right = true;
+        }
+    });
+    window.addEventListener('touchend', function() {
+        left = false;
+        right = false;
+    });
 
     var lastTime = performance.now();
     function render(timestamp) {
         requestAnimationFrame(render);
         var timepassed = timestamp - lastTime;
         lastTime = timestamp;
-        var warp = timepassed / 16;
+        var warp = Math.min(timepassed / 16, 2);
 
-        if(gameStarted){
-            if(!mobile){
-                if(left)
-                    me.data.steer = Math.PI / 6;
-                if(right)
-                    me.data.steer = -Math.PI / 6;
-                if(!(left ^ right))
-                    me.data.steer = 0;
+        if (me.data && me.model) {
+            if (left) me.data.steer = Math.PI / 6;
+            if (right) me.data.steer = -Math.PI / 6;
+            if (!(left ^ right)) me.data.steer = 0;
+
+            if (gameStarted && !gameSortaStarted) {
+                me.data.dir += me.data.steer / 10 * warp;
+                me.data.xv += Math.sin(me.data.dir) * SPEED * warp;
+                me.data.yv += Math.cos(me.data.dir) * SPEED * warp;
+
+                me.data.xv *= Math.pow(0.99, warp);
+                me.data.yv *= Math.pow(0.99, warp);
+
+                me.data.x += me.data.xv * warp;
+                me.data.y += me.data.yv * warp;
+
+                checkWallCollisions(me.data);
+
+                me.model.position.x = me.data.x;
+                me.model.position.z = me.data.y;
+                me.model.rotation.y = me.data.dir;
+
+                if (database && code && me.key) {
+                    database.ref(code + "/players/" + me.key).set({
+                        x: me.data.x,
+                        y: me.data.y,
+                        dir: me.data.dir,
+                        color: me.data.color,
+                        name: me.data.name
+                    });
+                }
             }
-            if(VR)
-                me.data.steer = camera.rotation.z;
-            me.data.steer = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, me.data.steer));
 
-            players[me.ref.path.pieces_[2]].data = me.data;
+            camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
+            camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
+            camera.position.y = me.model.position.y + 3;
+            camera.lookAt(me.model.position);
+        }
 
-            if(!gameSortaStarted){
-                for(var p in players){
-                    var play = players[p];
-
-                    play.data.dir += play.data.steer / 10 * warp;
-
-                    play.data.xv += Math.sin(play.data.dir) * SPEED * warp;
-                    play.data.yv += Math.cos(play.data.dir) * SPEED * warp;
-
-                    play.data.xv *= Math.pow(0.99, warp);
-                    play.data.yv *= Math.pow(0.99, warp);
-
-                    play.data.x += play.data.xv * warp;
-                    play.data.y += play.data.yv * warp;
-
-                    play.model.position.x = play.data.x + play.data.xv;
-                    play.model.position.z = play.data.y + play.data.yv;
-                    play.model.rotation.y = play.data.dir;
-
-                    play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
-                    play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
-
-                    for(var w in map.children){
-                        var wall = map.children[w];
-                        var posi = new THREE.Vector2(play.data.x, play.data.y);
-                        if(Math.abs(wall.plane.distanceToPoint(play.model.position.clone().sub(wall.position))) < WALL_SIZE){
-                            if(wall.position.clone().distanceTo(play.model.position) < wall.width / 2){
-                                var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-                                vel.reflect(wall.plane.normal);
-                                play.data.xv = vel.x + BOUNCE_CORRECT * wall.plane.normal.x * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
-                                play.data.yv = vel.z + BOUNCE_CORRECT * wall.plane.normal.z * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
-                                while(Math.abs(wall.plane.distanceToPoint(new THREE.Vector3(play.data.x, 0, play.data.y).sub(wall.position))) < WALL_SIZE){
-                                    play.data.x += play.data.xv;
-                                    play.data.y += play.data.yv;
-                                }
-                                play.data.xv *= BOUNCE;
-                                play.data.yv *= BOUNCE;
-                            }
-                        }
-                        if(posi.distanceTo(wall.p1) < WALL_SIZE + 0.1){
+        renderer.render(scene, camera);
+    }
+    requestAnimationFrame(render);
+}
