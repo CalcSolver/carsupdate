@@ -428,4 +428,14 @@ input{
 }
 #warning a {
 	color: white;
+/* FIX: Slide #host and #join onto the screen when created */
+#host, #join {
+    animation: slideInButtons 0.5s ease-out forwards !important;
+}
+
+@keyframes slideInButtons {
+    to {
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
+    }
 }
