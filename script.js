@@ -10,6 +10,8 @@ var MOUNTAIN_DIST = 250;
 var OOB_DIST = 200;
 var LAPS = 5;
 
+function MODS() {}
+
 var serverList = [
     {
         apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
@@ -39,18 +41,40 @@ function initFirebase() {
             app.auth().signInAnonymously().catch(function(e){ console.warn(e); });
         }
     } catch(e) {
-        console.error("Firebase init fallback:", e);
+        console.error("Firebase connection fallback:", e);
     }
 }
 initFirebase();
 
-// Setup UI animations on load
-window.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() { if (document.getElementById("title")) document.getElementById("title").style.transform = "none"; }, 500);
-    setTimeout(function() { if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none"; }, 1000);
-    setTimeout(function() { if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none"; }, 1200);
-    setTimeout(function() { if (document.getElementById("settings")) document.getElementById("settings").style.transform = "none"; }, 1400);
-});
+// Restore original title and menu animations
+setTimeout(function() {
+    if (document.getElementById("title")) document.getElementById("title").style.transform = "none";
+}, 500);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none";
+}, 1000);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none";
+}, 1200);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[2]) document.getElementsByClassName("menuitem")[2].style.transform = "none";
+}, 1400);
+setTimeout(function() {
+    if (document.getElementById("mywebsitelink")) document.getElementById("mywebsitelink").style.transform = "none";
+}, 1600);
+setTimeout(function() {
+    if (document.getElementById("settings")) document.getElementById("settings").style.transform = "none";
+}, 1800);
+
+if (top != self) {
+    if (document.getElementById("warning")) document.getElementById("warning").style.display = "block";
+}
+
+function forceScroll() {
+    requestAnimationFrame(forceScroll);
+    window.scrollTo(0, 0);
+}
+forceScroll();
 
 var camera, renderer, scene, labels = [];
 scene = new THREE.Scene();
@@ -61,121 +85,51 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 var mobile = navigator.userAgent.match("Mobile") != null || navigator.userAgent.match("Linux;") != null;
 var element = renderer.domElement;
 
-var name = "Player", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false;
+var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
 var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
 var s = document.getElementById("slider");
 
-// Color Picker Update
-function updateColorFromEvent(e) {
-    var picker = document.getElementById("colorpicker");
-    if (!picker) return;
-    var rect = picker.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    var pct = Math.max(0, Math.min(1, x / rect.width));
-    color = Math.floor(pct * 360);
-    
+var updateColor = function() {
     if (s) {
-        s.style.left = (pct * 100) + "%";
+        s.style.marginLeft = color / 360 * 80 + "vw";
         s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
     }
+    document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
 }
+updateColor();
 
-// Menu Transition -> Next Screen with Settings option backplate
 var menu2 = function() {
-    var nameInput = document.getElementById("name");
-    if (nameInput && nameInput.value.trim() !== "") {
-        name = nameInput.value.trim();
+    if (document.getElementById("name") && document.getElementById("name").value !== "") {
+        name = document.getElementById("name").value;
     }
-
+    
+    VR = document.getElementById("cardboard") ? document.getElementById("cardboard").className == "tools sel" : false;
+    
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
-            f.innerHTML = `
-                <div class='menuitem title button' id='host' onclick='host()'>Host Game</div>
-                <div class='menuitem title button' id='join' style='margin-top:15px;' onclick='joinGame()'>Join Game</div>
-                <div id='settings' class='menuitem title button' style='margin-top:15px;' onclick='toggleSettings()'>Settings</div>
-                <div id='settings-panel' style='display:none; margin-top:10px; font-size:12px; background:rgba(0,0,0,0.4); padding:10px; border-radius:8px;'>
-                    Laps: <input id='lapcount' type='number' value='5' style='width:40px;'>
-                </div>
-            `;
+            f.innerHTML = "<div class='menuitem title button' id='host' ontouchstart='this.click()' onclick='host()'>Host a game</div><div class='menuitem title button' ontouchstart='this.click()' id='join' onclick='joinGame()'>Join a game</div>";
             f.style.transform = "none";
+            
+            setTimeout(function() {
+                if (document.getElementById("host")) {
+                    document.getElementById("host").style.transform = "none";
+                    setTimeout(function() { document.getElementById("host").style.transition = "transform .2s, box-shadow .2s"; }, 500);
+                }
+            }, 500);
+            
+            setTimeout(function() {
+                if (document.getElementById("join")) {
+                    document.getElementById("join").style.transform = "none";
+                    setTimeout(function() { document.getElementById("join").style.transition = "transform .2s, box-shadow .2s"; }, 500);
+                }
+            }, 1000);
         }, 500);
     }
 }
 
-function toggleSettings() {
-    var panel = document.getElementById("settings-panel");
-    if (panel) {
-        panel.style.display = panel.style.display === "none" ? "block" : "none";
-    }
-}
-
-// Click Host Game
-var host = function() {
-    if (f) {
-        f.style.transform = "translate3d(0, -100vh, 0)";
-        setTimeout(function() {
-            f.innerHTML = `
-                <div class='info title'>Room Code:<br/><div id='code' style='font-size:32px; color:#00ff00; margin:10px 0;'>Generating...</div></div>
-                <div id='startgame' class='menuitem title button' onclick='startGame()'>Start!</div>
-            `;
-            f.style.transform = "none";
-            getCode();
-        }, 500);
-    }
-
-    function getCode() {
-        code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        var codeElem = document.getElementById("code");
-        if (codeElem) codeElem.innerHTML = code;
-
-        if (database) {
-            database.ref(code).set({
-                status: 0,
-                players: {},
-                timestamp: Date.now()
-            });
-            setupPlayerListeners();
-        } else {
-            // Local fallback player setup
-            createLocalPlayer();
-        }
-    }
-    init3DScene();
-}
-
-// Click Join Game
-var joinGame = function() {
-    if (f) {
-        f.style.transform = "translate3d(0, -100vh, 0)";
-        setTimeout(function() {
-            f.innerHTML = `
-                <div class='info title'>Enter Code:<br/>
-                    <input id='incode' class='title' style='text-transform:uppercase; margin-top:10px;' onkeyup='codeCheck(event)' maxlength='4'></input>
-                    <div class='menuitem title button' style='margin-top:10px;' onclick='submitJoinCode()'>Join</div>
-                </div>
-            `;
-            f.style.transform = "none";
-        }, 500);
-    }
-    init3DScene();
-}
-
-function submitJoinCode() {
-    var inputVal = document.getElementById("incode").value.toUpperCase();
-    if (inputVal) {
-        code = inputVal;
-        setupPlayerListeners();
-        if (f) f.innerHTML = "<div class='info title'>Joined Room: " + code + "<br/><span style='font-size:12px;'>Waiting for Host to start...</span></div>";
-    }
-}
-
-window.codeCheck = function(e) {
-    if (e.keyCode === 13) submitJoinCode();
-}
-
-// Start Game Trigger
+// Start Game Execution
 window.startGame = function() {
     if (database && code) {
         database.ref(code + "/status").set(1);
@@ -187,17 +141,84 @@ function triggerGameStartUI() {
     gameStarted = true;
     gameSortaStarted = true;
 
-    if (f) f.style.display = "none"; // Hide menu UI overlay completely when race starts
+    if (document.getElementsByClassName("info")[0]) document.getElementsByClassName("info")[0].outerHTML = "";
+    if (document.getElementById("startgame")) document.getElementById("startgame").outerHTML = "";
 
     var countDown = document.createElement("DIV");
     countDown.innerHTML = "3";
-    countDown.style.cssText = "position:fixed; top:40%; left:50%; transform:translate(-50%,-50%); font-size:80px; color:#fff; font-family:sans-serif; font-weight:bold; z-index:999;";
-    document.body.appendChild(countDown);
+    countDown.className = "title";
+    countDown.id = "countdown";
+    if (f) f.appendChild(countDown);
 
-    setTimeout(function() { if(countDown) countDown.innerHTML = "2"; }, 1000);
-    setTimeout(function() { if(countDown) countDown.innerHTML = "1"; }, 2000);
-    setTimeout(function() { if(countDown) countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
-    setTimeout(function() { if(countDown) countDown.remove(); }, 4000);
+    lap = document.createElement("DIV");
+    lap.innerHTML = "1/" + LAPS;
+    lap.className = "title";
+    lap.id = "lap";
+    if (f) f.appendChild(lap);
+
+    setTimeout(function() { if (countDown) countDown.innerHTML = "2"; }, 1000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = "1"; }, 2000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = ""; }, 4000);
+}
+
+var host = function() {
+    if (document.getElementById("host")) document.getElementById("host").onclick = null;
+    if (f) {
+        f.style.transform = "translate3d(0, -100vh, 0)";
+        setTimeout(function() {
+            f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
+            if (VR) f.innerHTML += "<div id='divider'></div>";
+            f.appendChild(element);
+            f.style.transform = "none";
+            getCode();
+        }, 1000);
+    }
+
+    function getCode() {
+        code = "";
+        var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (var i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+
+        var codeDisplay = document.getElementById("code");
+        if (codeDisplay) codeDisplay.innerHTML = code;
+
+        if (database) {
+            var trackData = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML : "";
+            database.ref(code).set({
+                status: 0,
+                players: {},
+                map: trackData,
+                timestamp: Date.now()
+            });
+            setupPlayerListeners();
+        } else {
+            createLocalPlayer();
+        }
+    }
+    join();
+}
+
+window.codeCheck = function(e) {
+    if (e.keyCode === 13) {
+        var inputVal = document.getElementById("incode").value.toUpperCase();
+        code = inputVal;
+        setupPlayerListeners();
+    }
+}
+
+var joinGame = function() {
+    if (document.getElementById("join")) document.getElementById("join").onclick = null;
+    if (f) {
+        f.style.transform = "translate3d(0, -100vh, 0)";
+        setTimeout(function() {
+            f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
+            if (VR) f.innerHTML += "<div id='divider'></div>";
+            f.appendChild(element);
+            f.style.transform = "none";
+        }, 1000);
+    }
+    join();
 }
 
 function createLocalPlayer() {
@@ -216,61 +237,46 @@ function setupPlayerListeners() {
     if (!database || !code) return;
 
     database.ref(code + "/players").on("child_added", function(p) {
-        if (p.key === me.refKey) return;
-        var plData = p.val();
-        var newModel = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(1, 1, 2),
-            new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + (plData.color || 0) + ", 100%, 50%)")})
-        );
-        newModel.position.set(plData.x || 0, 0.6, plData.y || 0);
-        scene.add(newModel);
+        var key = p.key;
+        if (players[key]) return;
 
-        players[p.key] = { data: plData, model: newModel };
+        var playData = p.val();
+        var model = new THREE.Mesh(
+            new THREE.BoxBufferGeometry(1, 1, 2),
+            new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + (playData.color || 0) + ", 100%, 50%)")})
+        );
+        model.position.set(playData.x || 0, 0.6, playData.y || 0);
+        scene.add(model);
+
+        players[key] = { data: playData, model: model };
     });
 
     database.ref(code + "/status").on("value", function(v) {
-        if (v.val() == 1) {
-            triggerGameStartUI();
-        }
+        if (v.val() == 1) triggerGameStartUI();
     });
 }
 
-// 3D Engine Initialization
 function loadMap() {
-    scene.background = new THREE.Color(0x7fb0ff);
-
-    // Track Ground Plane
     var ground = new THREE.Mesh(
         new THREE.PlaneBufferGeometry(1000, 1000),
         new THREE.MeshLambertMaterial({color: new THREE.Color(0x57c115)})
     );
     ground.rotation.set(-Math.PI / 2, 0, 0);
     scene.add(ground);
-
-    // Default Boundary Walls
-    var wallMat = new THREE.MeshLambertMaterial({color: 0xf48342});
-    var wall1 = new THREE.Mesh(new THREE.BoxBufferGeometry(100, 2, 1), wallMat);
-    wall1.position.set(0, 1, -50);
-    scene.add(wall1);
-
-    var wall2 = new THREE.Mesh(new THREE.BoxBufferGeometry(100, 2, 1), wallMat);
-    wall2.position.set(0, 1, 50);
-    scene.add(wall2);
 }
 
-function init3DScene() {
+function join() {
     loadMap();
+    scene.background = new THREE.Color(0x7fb0ff);
 
-    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 4, 8);
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(0, 3, 10);
     scene.add(camera);
 
-    var light = new THREE.DirectionalLight(0xffffff, 0.8);
-    light.position.set(100, 200, 100);
+    var light = new THREE.DirectionalLight(0xffffff, 0.7);
+    light.position.set(3000, 2000, -2000);
     scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-
-    document.body.appendChild(renderer.domElement);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
     window.addEventListener('keydown', function(e) {
         if (e.key === "ArrowLeft" || e.key === "a") left = true;
@@ -307,13 +313,8 @@ function init3DScene() {
                 me.model.position.x = me.data.x;
                 me.model.position.z = me.data.y;
                 me.model.rotation.y = me.data.dir;
-
-                if (database && code && me.refKey) {
-                    database.ref(code + "/players/" + me.refKey).update(me.data);
-                }
             }
 
-            // Lock camera directly behind player car
             camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
             camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
             camera.position.y = me.model.position.y + 3;
