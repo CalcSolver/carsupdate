@@ -1,200 +1,116 @@
-// Global State Variables
-var serverList = [
-    {
-        apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
-        authDomain: "racing-game-67477.firebaseapp.com",
-        databaseURL: "https://racing-game-67477-default-rtdb.firebaseio.com",
-        projectId: "racing-game-67477",
-        storageBucket: "racing-game-67477.firebasestorage.app",
-        messagingSenderId: "48596697348",
-        appId: "1:48596697348:web:897b9f78e511bc2f635051"
-    }
-];
-
-var app = null;
-var db = null;
-var auth = null;
-var roomCode = "";
-var playerID = "";
+// Global Setup
 var playerName = "Player";
 var carColor = 0;
+var roomCode = "";
+var db = null;
 
-// Initialize Firebase safely
-function initFirebase() {
-    if (db) return;
-
-    var existingApp = firebase.apps && firebase.apps.find(function(a) { return a.name === 'server0'; });
-
-    if (existingApp) {
-        app = existingApp;
-    } else if (typeof firebase !== 'undefined') {
-        app = firebase.initializeApp(serverList[0], 'server0');
+// Initialize Firebase safely on page load
+window.addEventListener("DOMContentLoaded", function () {
+    if (typeof firebase !== "undefined" && !firebase.apps.length) {
+        try {
+            firebase.initializeApp({
+                apiKey: "AIzaSyBhBjB9cD8IDFarhBMUoG_jhL_Gl277ZG8",
+                authDomain: "racing-game-67477.firebaseapp.com",
+                databaseURL: "https://racing-game-67477-default-rtdb.firebaseio.com",
+                projectId: "racing-game-67477",
+                storageBucket: "racing-game-67477.firebasestorage.app",
+                messagingSenderId: "48596697348",
+                appId: "1:48596697348:web:897b9f78e511bc2f635051"
+            });
+            db = firebase.database();
+            firebase.auth().signInAnonymously();
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
     }
+});
 
-    if (app) {
-        db = app.database();
-        auth = app.auth();
-
-        auth.signInAnonymously().catch(function(err) {
-            console.error("Firebase Auth Error:", err);
-        });
-    }
-}
-
-// Color Picker Handling
-function updateColorFromEvent(e) {
-    var picker = document.getElementById("colorpicker");
-    if (!picker) return;
-    
-    var rect = picker.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    var pct = Math.max(0, Math.min(1, x / rect.width));
-    carColor = Math.floor(pct * 360);
-    
-    var slider = document.getElementById("slider");
-    if (slider) {
-        slider.style.left = (pct * 100) + "%";
-        slider.style.backgroundColor = "hsl(" + carColor + ", 100%, 50%)";
-    }
-}
-
-// Menu Transition (Reuses existing layout elements to preserve CSS styling)
+// Start button trigger (called directly from index.html)
 function menu2() {
     var nameInput = document.getElementById("name");
     if (nameInput && nameInput.value.trim() !== "") {
         playerName = nameInput.value.trim();
     }
 
-    initFirebase();
-
-    // Change title text
     var title = document.getElementById("title");
-    if (title) title.innerText = "Multiplayer Lobby";
-
-    // Change input box to accept Room Code
-    if (nameInput) {
-        nameInput.value = "";
-        nameInput.placeholder = "Enter Code (Optional)";
-        nameInput.style.textTransform = "uppercase";
-    }
-
-    // Reuse Start button for Host/Join actions
     var startBtn = document.getElementById("start");
-    if (startBtn) {
-        startBtn.innerText = "Host or Join Game";
-        startBtn.onclick = function() {
-            var inputCode = nameInput ? nameInput.value.trim().toUpperCase() : "";
-            if (inputCode.length > 0) {
-                joinGame(inputCode);
-            } else {
-                hostGame();
-            }
-        };
+
+    // Check if code was typed into the name input box
+    var enteredCode = nameInput ? nameInput.value.trim().toUpperCase() : "";
+
+    if (enteredCode.length === 4) {
+        // Join Game Mode
+        if (title) title.innerText = "Joining " + enteredCode + "...";
+        joinRoom(enteredCode);
+    } else {
+        // Host Game Mode
+        if (title) title.innerText = "Creating Room...";
+        hostRoom();
     }
 }
 
 // Host Room Logic
-function hostGame() {
+function hostRoom() {
+    roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
     var title = document.getElementById("title");
-    if (title) title.innerText = "Creating Room...";
+    var startBtn = document.getElementById("start");
 
     if (!db) {
-        initFirebase();
+        if (title) title.innerText = "Room Code: " + roomCode + " (Offline)";
+        return;
     }
 
-    roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-    playerID = "p1_" + Math.random().toString(36).substring(2, 6);
-
-    var roomRef = db.ref("rooms/" + roomCode);
-
-    roomRef.set({
+    db.ref("rooms/" + roomCode).set({
         created: Date.now(),
         status: "waiting",
-        players: {
-            [playerID]: {
-                name: playerName,
-                color: carColor,
-                isHost: true
-            }
+        host: playerName
+    }).then(function () {
+        if (title) title.innerText = "Room: " + roomCode;
+        if (startBtn) {
+            startBtn.innerText = "Start Race!";
+            startBtn.onclick = function () {
+                db.ref("rooms/" + roomCode).update({ status: "playing" });
+            };
         }
-    }).then(function() {
-        showRoomCodeUI(true);
-        listenForPlayers();
-    }).catch(function(err) {
-        if (title) title.innerText = "Error: " + err.message;
+        listenForStart();
+    }).catch(function (err) {
+        if (title) title.innerText = "Error connecting to server";
+        console.error(err);
     });
 }
 
 // Join Room Logic
-function joinGame(inputCode) {
+function joinRoom(code) {
     var title = document.getElementById("title");
-    if (title) title.innerText = "Connecting...";
+    var startBtn = document.getElementById("start");
 
-    if (!db) {
-        initFirebase();
-    }
+    if (!db) return;
 
-    var roomRef = db.ref("rooms/" + inputCode);
-    roomRef.once("value").then(function(snapshot) {
+    db.ref("rooms/" + code).once("value").then(function (snapshot) {
         if (!snapshot.exists()) {
             if (title) title.innerText = "Room Not Found!";
             return;
         }
 
-        roomCode = inputCode;
-        playerID = "p2_" + Math.random().toString(36).substring(2, 6);
-
-        db.ref("rooms/" + roomCode + "/players/" + playerID).set({
-            name: playerName,
-            color: carColor,
-            isHost: false
-        }).then(function() {
-            showRoomCodeUI(false);
-            listenForPlayers();
-        });
-    }).catch(function(err) {
-        if (title) title.innerText = "Error: " + err.message;
-    });
-}
-
-// Displays Room Code in Title
-function showRoomCodeUI(isHost) {
-    var title = document.getElementById("title");
-    if (title) title.innerText = "Room: " + roomCode;
-
-    var startBtn = document.getElementById("start");
-    if (startBtn) {
-        if (isHost) {
-            startBtn.innerText = "Start Race!";
-            startBtn.onclick = startGame;
-        } else {
+        roomCode = code;
+        if (title) title.innerText = "Joined Room: " + roomCode;
+        if (startBtn) {
             startBtn.innerText = "Waiting for Host...";
             startBtn.onclick = null;
         }
-    }
-}
-
-// Listen for Room State Updates
-function listenForPlayers() {
-    if (!db) return;
-
-    db.ref("rooms/" + roomCode + "/status").on("value", function(snapshot) {
-        if (snapshot.val() === "playing") {
-            init3DRace();
-        }
+        listenForStart();
     });
 }
 
-// Trigger Start Signal
-function startGame() {
-    if (db && roomCode) {
-        db.ref("rooms/" + roomCode).update({ status: "playing" });
-    }
-}
+// Listen for race launch
+function listenForStart() {
+    if (!db || !roomCode) return;
 
-// Hide menu and enter 3D scene
-function init3DRace() {
-    var fore = document.getElementById("fore");
-    if (fore) fore.style.display = "none";
-    console.log("Race Started in Room:", roomCode);
+    db.ref("rooms/" + roomCode + "/status").on("value", function (snapshot) {
+        if (snapshot.val() === "playing") {
+            var fore = document.getElementById("fore");
+            if (fore) fore.style.display = "none";
+            alert("Race Started!");
+        }
+    });
 }
