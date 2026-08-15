@@ -8,6 +8,7 @@ var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
 var LAPS = 5;
 
+// Complete OG Track Code String
 var OG_TRACK_CODE = "1,5/0,7 0,7/-1,8 -1,8/-3,9 -3,9/-7,9 -7,9/-9,8 -9,8/-10,7 -10,7/-11,5 -6,7/-4,7 -4,7/-2,6 -2,6/-1,4 -6,7/-8,6 -8,6/-9,4 -1,4/-1,0 1,0/1,5 -11,5/-11,0 -11,0/-10,-1 -10,-1/-8,-1 -8,-1/-7,0 -7,0/-7,2 -9,3/-8,4 -8,4/-6,4 -6,4/-5,3 -5,3/-5,1 -9,1/-9,4 -5,3/-4,4 -4,4/-2,4 -2,4/-1,3 -7,0/-6,-1 -6,-1/-4,-1 -4,-1/-3,0 -3,0/-3,2 -1,0/-1,-2 -1,-2/0,-4 0,-4/2,-5 2,-5/4,-5 4,-5/6,-4 6,-4/7,-2 -3,0/-3,-3 -3,-3/-2,-5 -2,-5/-1,-6 -1,-6/1,-7 1,-7/5,-7 5,-7/7,-6 7,-6/8,-5 8,-5/9,-3 9,-3/9,2 9,2/8,4 8,4/6,5 6,5/4,5 4,5/2,4 2,4/1,2 7,-2/7,2 7,2/6,3 6,3/4,3 4,3/3,2 4,-3/2,-3 2,-3/1,-2 1,-2/1,0 4,-3/5,-2 5,-2/5,1 3,2/3,-1 |-1,3/1,3 6,-4/7,-6 |-7,5 -5,6 -4,5 2,6 1,8 3,9 4,6 3,7 -3,10 -4,12 -10,11 -12,8 -14,8 -12,6 -7,10 -12,2 -15,3 -13,-1 -10,-4 -8,-2 -6,-4 -4,-3 -11,-2 -8,-3 -4,-5 -3,-6 -5,-2 0,-8 -2,-8 -4,-8 -5,-6 -3,-10 2,-9 4,-8 5,-10 6,-8 10,-7 8,-7 9,-11 9,-5 15,-4 11,-2 11,-1 10,3 16,2 12,1 8,6 7,9 6,6 -8,-7 -13,-7 -13,-4 -15,-4 -17,0 |1,3,6/22 0,3,8/55 -2,3,9/77 -8,3,9/115 -10,3,8/148 -11,3,6/166 -8,3,4/-86 -7,3,4/-83 -6,3,4/-90 -10,3,-1/-83 -9,3,-1/-88 -8,3,-1/-90 -6,3,-1/-89 -5,3,-1/-89 -4,3,-1/-89 -4,3,4/-90 -3,3,4/-90 -2,3,4/265 -3,3,-4/194 -2,3,-6/218 0,3,-7/262 6,3,-7/-69 8,3,-6/-42 9,3,-4/-16 9,3,4/40 8,3,5/70 2,3,5/135 3,3,6/122 |";
 
 var serverList = [
@@ -39,21 +40,21 @@ function initFirebase() {
             app.auth().signInAnonymously().catch(function(e){ console.warn(e); });
         }
     } catch(e) {
-        console.warn("Firebase fallback active:", e);
+        console.warn("Firebase running in offline/local mode:", e);
     }
 }
 initFirebase();
 
-// Safe animations (will not break execution if element is missing)
-function safeAnimate(id, delay) {
+// Menu Slide Animations
+function animateElement(id, delay) {
     setTimeout(function() {
         var el = document.getElementById(id);
         if (el) el.style.transform = "none";
     }, delay);
 }
-safeAnimate("title", 500);
-safeAnimate("mywebsitelink", 1600);
-safeAnimate("settings", 1800);
+animateElement("title", 500);
+animateElement("mywebsitelink", 1600);
+animateElement("settings", 1800);
 
 setTimeout(function() {
     var items = document.getElementsByClassName("menuitem");
@@ -62,6 +63,13 @@ setTimeout(function() {
     if (items[2]) items[2].style.transform = "none";
 }, 1000);
 
+function forceScroll() {
+    requestAnimationFrame(forceScroll);
+    window.scrollTo(0, 0);
+}
+forceScroll();
+
+// Scene & Renderer Setup
 var camera, renderer, scene;
 scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -84,7 +92,26 @@ var updateColor = function() {
 }
 updateColor();
 
-var menu2 = function() {
+// Color Slider Drag Logic
+var draggingSlider = false;
+if (s) {
+    var startDrag = function() { draggingSlider = true; };
+    var stopDrag = function() { draggingSlider = false; };
+    var moveDrag = function(e) {
+        if (!draggingSlider) return;
+        var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        color = Math.max(0, Math.min(360, Math.floor((clientX / window.innerWidth) * 360)));
+        updateColor();
+    };
+    s.addEventListener("mousedown", startDrag);
+    s.addEventListener("touchstart", startDrag);
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("touchend", stopDrag);
+    window.addEventListener("mousemove", moveDrag);
+    window.addEventListener("touchmove", moveDrag);
+}
+
+window.menu2 = function() {
     var nameInput = document.getElementById("name");
     if (nameInput && nameInput.value !== "") {
         name = nameInput.value;
@@ -136,7 +163,7 @@ function triggerGameStartUI() {
     setTimeout(function() { if (countDown) countDown.innerHTML = ""; }, 4000);
 }
 
-var host = function() {
+window.host = function() {
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
@@ -175,7 +202,7 @@ window.codeCheck = function(e) {
     }
 }
 
-var joinGame = function() {
+window.joinGame = function() {
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
@@ -202,6 +229,7 @@ function setupPlayerListeners() {
     createLocalPlayer();
     if (!database || !code) return;
 
+    // Listen for new players
     database.ref(code + "/players").on("child_added", function(p) {
         var key = p.key;
         if (players[key]) return;
@@ -213,6 +241,17 @@ function setupPlayerListeners() {
         model.position.set(playData.x || 0, 0.6, playData.y || 0);
         scene.add(model);
         players[key] = { data: playData, model: model };
+    });
+
+    // Listen for position changes from multiplayer host/joiners
+    database.ref(code + "/players").on("child_changed", function(p) {
+        var key = p.key;
+        if (players[key] && key !== me.key) {
+            var val = p.val();
+            players[key].model.position.x = val.x;
+            players[key].model.position.z = val.y;
+            players[key].model.rotation.y = val.dir;
+        }
     });
 
     database.ref(code + "/status").on("value", function(v) {
@@ -260,6 +299,7 @@ function loadMap() {
     }
     scene.add(mapObj);
 
+    // Green Grass Ground Plane
     var ground = new THREE.Mesh(
         new THREE.PlaneBufferGeometry(2000, 2000),
         new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
@@ -314,6 +354,7 @@ function join() {
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
+    // Keyboard controls
     window.addEventListener('keydown', function(e) {
         if (e.key === "ArrowLeft" || e.key === "a") left = true;
         if (e.key === "ArrowRight" || e.key === "d") right = true;
@@ -323,6 +364,7 @@ function join() {
         if (e.key === "ArrowRight" || e.key === "d") right = false;
     });
 
+    // iPad / Touch Controls
     window.addEventListener('touchstart', function(e) {
         if (e.touches && e.touches[0]) {
             var touchX = e.touches[0].clientX;
@@ -363,8 +405,20 @@ function join() {
                 me.model.position.x = me.data.x;
                 me.model.position.z = me.data.y;
                 me.model.rotation.y = me.data.dir;
+
+                // Broadcast local coordinates to Firebase if connected
+                if (database && code && me.key) {
+                    database.ref(code + "/players/" + me.key).set({
+                        x: me.data.x,
+                        y: me.data.y,
+                        dir: me.data.dir,
+                        color: me.data.color,
+                        name: me.data.name
+                    });
+                }
             }
 
+            // Smooth Camera Tracking
             camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
             camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
             camera.position.y = me.model.position.y + 3;
