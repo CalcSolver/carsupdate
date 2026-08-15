@@ -21,7 +21,7 @@
     <!-- Stylesheets -->
     <link href="style.css" rel="stylesheet">
 
-    <!-- Libraries (Three.js & Firebase Compat) -->
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -44,13 +44,13 @@
         </div>
         
         <div class="menuitem title">Choose a color:<br/>
-            <div id="colorpicker" onclick="if(window.updateColorFromEvent) updateColorFromEvent(event)">
+            <div id="colorpicker" onclick="updateColorFromEvent(event)">
                 <div id="slider"></div>
             </div>
         </div>
 
         <div class="menuitem title">
-            <div id="start" onclick="if(typeof menu2 === 'function'){ menu2(); }">Start!</div>
+            <div id="start" onclick="menu2()">Start!</div>
         </div>
         
         <a id="mywebsitelink" href="#" target="_blank" style="display:none;"></a>
@@ -59,25 +59,9 @@
         <div id="toolbar">
             <div class="tools" id="edit" onclick="window.open('editor/index.html')"></div>
             <div class="tools" id="help" onclick="window.open('help/index.html')">?</div>
-            <div class="tools" id="cardboard"></div>
         </div>
     </div>
 
-    <script>
-        // Color Picker Click Handler
-        function updateColorFromEvent(e) {
-            var picker = document.getElementById("colorpicker");
-            var rect = picker.getBoundingClientRect();
-            var x = e.clientX - rect.left;
-            var pct = Math.max(0, Math.min(1, x / rect.width));
-            if (typeof color !== 'undefined' && typeof updateColor === 'function') {
-                color = Math.floor(pct * 360);
-                updateColor();
-            }
-        }
-    </script>
-
-    <!-- Main Game Logic -->
     <script src="script.js"></script>
 </body>
 </html>
