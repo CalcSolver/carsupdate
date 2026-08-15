@@ -82,6 +82,13 @@ renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 
+// Append renderer element to screen body so canvas is always rendered behind UI
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.zIndex = "-1";
+
 var mobile = navigator.userAgent.match("Mobile") != null || navigator.userAgent.match("Linux;") != null;
 var element = renderer.domElement;
 
@@ -169,7 +176,6 @@ var host = function() {
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
             if (VR) f.innerHTML += "<div id='divider'></div>";
-            f.appendChild(element);
             f.style.transform = "none";
             getCode();
         }, 1000);
@@ -214,7 +220,6 @@ var joinGame = function() {
         setTimeout(function() {
             f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
             if (VR) f.innerHTML += "<div id='divider'></div>";
-            f.appendChild(element);
             f.style.transform = "none";
         }, 1000);
     }
@@ -224,10 +229,10 @@ var joinGame = function() {
 function createLocalPlayer() {
     me.data = { x: 0, y: 0, xv: 0, yv: 0, dir: 0, steer: 0, color: color, name: name };
     me.model = new THREE.Mesh(
-        new THREE.BoxBufferGeometry(1, 1, 2),
+        new THREE.BoxBufferGeometry(1.2, 0.8, 2.2),
         new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + color + ", 100%, 50%)")})
     );
-    me.model.position.set(0, 0.6, 0);
+    me.model.position.set(0, 0.4, 0);
     scene.add(me.model);
     players["local"] = me;
 }
@@ -242,10 +247,10 @@ function setupPlayerListeners() {
 
         var playData = p.val();
         var model = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(1, 1, 2),
+            new THREE.BoxBufferGeometry(1.2, 0.8, 2.2),
             new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + (playData.color || 0) + ", 100%, 50%)")})
         );
-        model.position.set(playData.x || 0, 0.6, playData.y || 0);
+        model.position.set(playData.x || 0, 0.4, playData.y || 0);
         scene.add(model);
 
         players[key] = { data: playData, model: model };
@@ -257,24 +262,46 @@ function setupPlayerListeners() {
 }
 
 function loadMap() {
-    var ground = new THREE.Mesh(
-        new THREE.PlaneBufferGeometry(1000, 1000),
-        new THREE.MeshLambertMaterial({color: new THREE.Color(0x57c115)})
-    );
-    ground.rotation.set(-Math.PI / 2, 0, 0);
+    // Clear old elements if reloading
+    scene.background = new THREE.Color(0x7fb0ff);
+
+    // Main Grass Field
+    var groundGeo = new THREE.PlaneBufferGeometry(2000, 2000);
+    var groundMat = new THREE.MeshLambertMaterial({ color: 0x57c115 });
+    var ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
     scene.add(ground);
+
+    // Track Asphalt Road Loops & Outer Barriers
+    var roadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    var wallMat = new THREE.MeshLambertMaterial({ color: 0xdd4433 });
+
+    // Inner Track Oval
+    var roadTrack = new THREE.Mesh(new THREE.RingBufferGeometry(30, 60, 32), roadMat);
+    roadTrack.rotation.x = -Math.PI / 2;
+    roadTrack.position.y = 0.01;
+    scene.add(roadTrack);
+
+    // Track Guard Rails / Boundary Walls
+    var outerWall = new THREE.Mesh(new THREE.CylinderBufferGeometry(61, 61, 2, 32, 1, true), wallMat);
+    outerWall.position.y = 1;
+    scene.add(outerWall);
+
+    var innerWall = new THREE.Mesh(new THREE.CylinderBufferGeometry(29, 29, 2, 32, 1, true), wallMat);
+    innerWall.position.y = 1;
+    scene.add(innerWall);
 }
 
 function join() {
     loadMap();
-    scene.background = new THREE.Color(0x7fb0ff);
 
-    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.set(0, 3, 10);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 10);
     scene.add(camera);
 
-    var light = new THREE.DirectionalLight(0xffffff, 0.7);
-    light.position.set(3000, 2000, -2000);
+    var light = new THREE.DirectionalLight(0xffffff, 0.8);
+    light.position.set(100, 200, 100);
     scene.add(light);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
@@ -294,12 +321,12 @@ function join() {
         lastTime = timestamp;
         var warp = Math.min(timepassed / 16, 2);
 
-        if (gameStarted && me.data && me.model) {
+        if (me.data && me.model) {
             if (left) me.data.steer = Math.PI / 6;
             if (right) me.data.steer = -Math.PI / 6;
             if (!(left ^ right)) me.data.steer = 0;
 
-            if (!gameSortaStarted) {
+            if (!gameSortaStarted && gameStarted) {
                 me.data.dir += me.data.steer / 10 * warp;
                 me.data.xv += Math.sin(me.data.dir) * SPEED * warp;
                 me.data.yv += Math.cos(me.data.dir) * SPEED * warp;
@@ -315,9 +342,9 @@ function join() {
                 me.model.rotation.y = me.data.dir;
             }
 
-            camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 6;
-            camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 6;
-            camera.position.y = me.model.position.y + 3;
+            camera.position.x = me.model.position.x - Math.sin(me.data.dir) * 8;
+            camera.position.z = me.model.position.z - Math.cos(me.data.dir) * 8;
+            camera.position.y = me.model.position.y + 4;
             camera.lookAt(me.model.position);
         }
 
