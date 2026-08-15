@@ -1,4 +1,4 @@
-var SPEED = 0.004;
+var SPEED = 0.008; // Increased speed for responsive driving
 var CAMERA_LAG = 0.9;
 var COLLISION = 1.1;
 var BOUNCE = 0.7;
@@ -6,8 +6,6 @@ var mapscale = 5;
 var VR = false;
 var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
-var MOUNTAIN_DIST = 250;
-var OOB_DIST = 200;
 var LAPS = 5;
 
 // Exact OG Track String
@@ -47,7 +45,6 @@ function initFirebase() {
 }
 initFirebase();
 
-// Menu Transitions
 setTimeout(function() { if (document.getElementById("title")) document.getElementById("title").style.transform = "none"; }, 500);
 setTimeout(function() { if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none"; }, 1000);
 setTimeout(function() { if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none"; }, 1200);
@@ -70,7 +67,7 @@ var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = 
 var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
 var s = document.getElementById("slider");
-var wallSegments = []; // Collision checking list
+var wallSegments = [];
 
 var updateColor = function() {
     if (s) {
@@ -122,7 +119,10 @@ function triggerGameStartUI() {
 
     setTimeout(function() { if (countDown) countDown.innerHTML = "2"; }, 1000);
     setTimeout(function() { if (countDown) countDown.innerHTML = "1"; }, 2000);
-    setTimeout(function() { if (countDown) countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
+    setTimeout(function() { 
+        if (countDown) countDown.innerHTML = "GO!"; 
+        gameSortaStarted = false; // Enable active driving inputs
+    }, 3000);
     setTimeout(function() { if (countDown) countDown.innerHTML = ""; }, 4000);
 }
 
@@ -158,6 +158,7 @@ window.codeCheck = function(e) {
     if (e.keyCode === 13) {
         code = document.getElementById("incode").value.toUpperCase();
         setupPlayerListeners();
+        triggerGameStartUI();
     }
 }
 
@@ -206,7 +207,6 @@ function setupPlayerListeners() {
     });
 }
 
-// Complete OG Track Parser with Wall Data for Collisions
 function loadMap() {
     scene.background = new THREE.Color(0x7fb0ff);
     wallSegments = [];
@@ -243,12 +243,10 @@ function loadMap() {
         wall.rotation.y = angle;
         mapObj.add(wall);
 
-        // Save wall segment positions for collision calculations
-        wallSegments.push({ x1: x1, z1: z1, x2: x2, z2: z2, dist: dist });
+        wallSegments.push({ x1: x1, z1: z1, x2: x2, z2: z2 });
     }
     scene.add(mapObj);
 
-    // Ground Plane
     var ground = new THREE.Mesh(
         new THREE.PlaneBufferGeometry(2000, 2000),
         new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
@@ -257,7 +255,6 @@ function loadMap() {
     scene.add(ground);
 }
 
-// Physics Collision Engine - Prevents Driving Through Walls
 function checkWallCollisions(player) {
     var px = player.x;
     var pz = player.y;
@@ -266,7 +263,6 @@ function checkWallCollisions(player) {
     for (var i = 0; i < wallSegments.length; i++) {
         var w = wallSegments[i];
         
-        // Find nearest point on wall line segment to player
         var l2 = (w.x2 - w.x1) * (w.x2 - w.x1) + (w.z2 - w.z1) * (w.z2 - w.z1);
         if (l2 === 0) continue;
         var t = ((px - w.x1) * (w.x2 - w.x1) + (pz - w.z1) * (w.z2 - w.z1)) / l2;
@@ -280,7 +276,6 @@ function checkWallCollisions(player) {
         var distance = Math.sqrt(distX * distX + distZ * distZ);
 
         if (distance < carRadius) {
-            // Push player outside wall boundary
             var overlap = carRadius - distance;
             var nx = distX / (distance || 1);
             var nz = distZ / (distance || 1);
@@ -288,7 +283,6 @@ function checkWallCollisions(player) {
             player.x += nx * overlap;
             player.y += nz * overlap;
 
-            // Bounce & reduce momentum
             player.xv *= -BOUNCE;
             player.yv *= -BOUNCE;
         }
@@ -328,7 +322,8 @@ function join() {
             if (right) me.data.steer = -Math.PI / 6;
             if (!(left ^ right)) me.data.steer = 0;
 
-            if (!gameSortaStarted && gameStarted) {
+            // Drive physics run once game is started
+            if (gameStarted && !gameSortaStarted) {
                 me.data.dir += me.data.steer / 10 * warp;
                 me.data.xv += Math.sin(me.data.dir) * SPEED * warp;
                 me.data.yv += Math.cos(me.data.dir) * SPEED * warp;
@@ -339,7 +334,6 @@ function join() {
                 me.data.x += me.data.xv * warp;
                 me.data.y += me.data.yv * warp;
 
-                // Run wall pushing physics
                 checkWallCollisions(me.data);
 
                 me.model.position.x = me.data.x;
