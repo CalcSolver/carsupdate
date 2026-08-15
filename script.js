@@ -1,4 +1,4 @@
-var SPEED = 0.008; // Increased speed for responsive driving
+var SPEED = 0.004;
 var CAMERA_LAG = 0.9;
 var COLLISION = 1.1;
 var BOUNCE = 0.7;
@@ -6,10 +6,11 @@ var mapscale = 5;
 var VR = false;
 var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
+var MOUNTAIN_DIST = 250;
+var OOB_DIST = 200;
 var LAPS = 5;
 
-// Exact OG Track String
-var OG_TRACK_CODE = "1,5/0,7 0,7/-1,8 -1,8/-3,9 -3,9/-7,9 -7,9/-9,8 -9,8/-10,7 -10,7/-11,5 -6,7/-4,7 -4,7/-2,6 -2,6/-1,4 -6,7/-8,6 -8,6/-9,4 -1,4/-1,0 1,0/1,5 -11,5/-11,0 -11,0/-10,-1 -10,-1/-8,-1 -8,-1/-7,0 -7,0/-7,2 -9,3/-8,4 -8,4/-6,4 -6,4/-5,3 -5,3/-5,1 -9,1/-9,4 -5,3/-4,4 -4,4/-2,4 -2,4/-1,3 -7,0/-6,-1 -6,-1/-4,-1 -4,-1/-3,0 -3,0/-3,2 -1,0/-1,-2 -1,-2/0,-4 0,-4/2,-5 2,-5/4,-5 4,-5/6,-4 6,-4/7,-2 -3,0/-3,-3 -3,-3/-2,-5 -2,-5/-1,-6 -1,-6/1,-7 1,-7/5,-7 5,-7/7,-6 7,-6/8,-5 8,-5/9,-3 9,-3/9,2 9,2/8,4 8,4/6,5 6,5/4,5 4,5/2,4 2,4/1,2 7,-2/7,2 7,2/6,3 6,3/4,3 4,3/3,2 4,-3/2,-3 2,-3/1,-2 1,-2/1,0 4,-3/5,-2 5,-2/5,1 3,2/3,-1 |-1,3/1,3 6,-4/7,-6 |-7,5 -5,6 -4,5 2,6 1,8 3,9 4,6 3,7 -3,10 -4,12 -10,11 -12,8 -14,8 -12,6 -7,10 -12,2 -15,3 -13,-1 -10,-4 -8,-2 -6,-4 -4,-3 -11,-2 -8,-3 -4,-5 -3,-6 -5,-2 0,-8 -2,-8 -4,-8 -5,-6 -3,-10 2,-9 4,-8 5,-10 6,-8 10,-7 8,-7 9,-11 9,-5 15,-4 11,-2 11,-1 10,3 16,2 12,1 8,6 7,9 6,6 -8,-7 -13,-7 -13,-4 -15,-4 -17,0 |1,3,6/22 0,3,8/55 -2,3,9/77 -8,3,9/115 -10,3,8/148 -11,3,6/166 -8,3,4/-86 -7,3,4/-83 -6,3,4/-90 -10,3,-1/-83 -9,3,-1/-88 -8,3,-1/-90 -6,3,-1/-89 -5,3,-1/-89 -4,3,-1/-89 -4,3,4/-90 -3,3,4/-90 -2,3,4/265 -3,3,-4/194 -2,3,-6/218 0,3,-7/262 6,3,-7/-69 8,3,-6/-42 9,3,-4/-16 9,3,4/40 8,3,5/70 2,3,5/135 3,3,6/122 |";
+function MODS() {}
 
 var serverList = [
     {
@@ -40,15 +41,34 @@ function initFirebase() {
             app.auth().signInAnonymously().catch(function(e){ console.warn(e); });
         }
     } catch(e) {
-        console.error("Firebase load fallback:", e);
+        console.error("Firebase connection fallback:", e);
     }
 }
 initFirebase();
 
-setTimeout(function() { if (document.getElementById("title")) document.getElementById("title").style.transform = "none"; }, 500);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none"; }, 1000);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none"; }, 1200);
-setTimeout(function() { if (document.getElementsByClassName("menuitem")[2]) document.getElementsByClassName("menuitem")[2].style.transform = "none"; }, 1400);
+// Original Animations
+setTimeout(function() {
+    if (document.getElementById("title")) document.getElementById("title").style.transform = "none";
+}, 500);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[0]) document.getElementsByClassName("menuitem")[0].style.transform = "none";
+}, 1000);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[1]) document.getElementsByClassName("menuitem")[1].style.transform = "none";
+}, 1200);
+setTimeout(function() {
+    if (document.getElementsByClassName("menuitem")[2]) document.getElementsByClassName("menuitem")[2].style.transform = "none";
+}, 1400);
+setTimeout(function() {
+    if (document.getElementById("mywebsitelink")) document.getElementById("mywebsitelink").style.transform = "none";
+}, 1600);
+setTimeout(function() {
+    if (document.getElementById("settings")) document.getElementById("settings").style.transform = "none";
+}, 1800);
+
+if (top != self) {
+    if (document.getElementById("warning")) document.getElementById("warning").style.display = "block";
+}
 
 function forceScroll() {
     requestAnimationFrame(forceScroll);
@@ -56,18 +76,19 @@ function forceScroll() {
 }
 forceScroll();
 
-var camera, renderer, scene;
+var camera, renderer, scene, labels = [];
 scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 
+var mobile = navigator.userAgent.match("Mobile") != null || navigator.userAgent.match("Linux;") != null;
 var element = renderer.domElement;
+
 var name = "Nerd with No Name", code = "", players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
 var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
 var s = document.getElementById("slider");
-var wallSegments = [];
 
 var updateColor = function() {
     if (s) {
@@ -82,11 +103,28 @@ var menu2 = function() {
     if (document.getElementById("name") && document.getElementById("name").value !== "") {
         name = document.getElementById("name").value;
     }
+    
+    VR = document.getElementById("cardboard") ? document.getElementById("cardboard").className == "tools sel" : false;
+    
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
-            f.innerHTML = "<div class='menuitem title button' id='host' onclick='host()'>Host a game</div><div class='menuitem title button' id='join' onclick='joinGame()'>Join a game</div>";
+            f.innerHTML = "<div class='menuitem title button' id='host' ontouchstart='this.click()' onclick='host()'>Host a game</div><div class='menuitem title button' ontouchstart='this.click()' id='join' onclick='joinGame()'>Join a game</div>";
             f.style.transform = "none";
+            
+            setTimeout(function() {
+                if (document.getElementById("host")) {
+                    document.getElementById("host").style.transform = "none";
+                    setTimeout(function() { document.getElementById("host").style.transition = "transform .2s, box-shadow .2s"; }, 500);
+                }
+            }, 500);
+            
+            setTimeout(function() {
+                if (document.getElementById("join")) {
+                    document.getElementById("join").style.transform = "none";
+                    setTimeout(function() { document.getElementById("join").style.transition = "transform .2s, box-shadow .2s"; }, 500);
+                }
+            }, 1000);
         }, 500);
     }
 }
@@ -119,18 +157,17 @@ function triggerGameStartUI() {
 
     setTimeout(function() { if (countDown) countDown.innerHTML = "2"; }, 1000);
     setTimeout(function() { if (countDown) countDown.innerHTML = "1"; }, 2000);
-    setTimeout(function() { 
-        if (countDown) countDown.innerHTML = "GO!"; 
-        gameSortaStarted = false; // Enable active driving inputs
-    }, 3000);
+    setTimeout(function() { if (countDown) countDown.innerHTML = "GO!"; gameSortaStarted = false; }, 3000);
     setTimeout(function() { if (countDown) countDown.innerHTML = ""; }, 4000);
 }
 
 var host = function() {
+    if (document.getElementById("host")) document.getElementById("host").onclick = null;
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
-            f.innerHTML = "<div class='info title'>Use this code to join!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()'>Start!</div>";
+            f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
+            if (VR) f.innerHTML += "<div id='divider'></div>";
             f.appendChild(element);
             f.style.transform = "none";
             getCode();
@@ -141,11 +178,18 @@ var host = function() {
         code = "";
         var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (var i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+
         var codeDisplay = document.getElementById("code");
         if (codeDisplay) codeDisplay.innerHTML = code;
 
         if (database) {
-            database.ref(code).set({ status: 0, players: {}, timestamp: Date.now() });
+            var trackData = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML : "";
+            database.ref(code).set({
+                status: 0,
+                players: {},
+                map: trackData,
+                timestamp: Date.now()
+            });
             setupPlayerListeners();
         } else {
             createLocalPlayer();
@@ -156,17 +200,19 @@ var host = function() {
 
 window.codeCheck = function(e) {
     if (e.keyCode === 13) {
-        code = document.getElementById("incode").value.toUpperCase();
+        var inputVal = document.getElementById("incode").value.toUpperCase();
+        code = inputVal;
         setupPlayerListeners();
-        triggerGameStartUI();
     }
 }
 
 var joinGame = function() {
+    if (document.getElementById("join")) document.getElementById("join").onclick = null;
     if (f) {
         f.style.transform = "translate3d(0, -100vh, 0)";
         setTimeout(function() {
-            f.innerHTML = "<div class='info title'>Enter Code:<input id='incode' class='title' onkeyup='codeCheck(event)'></input></div>";
+            f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
+            if (VR) f.innerHTML += "<div id='divider'></div>";
             f.appendChild(element);
             f.style.transform = "none";
         }, 1000);
@@ -192,6 +238,7 @@ function setupPlayerListeners() {
     database.ref(code + "/players").on("child_added", function(p) {
         var key = p.key;
         if (players[key]) return;
+
         var playData = p.val();
         var model = new THREE.Mesh(
             new THREE.BoxBufferGeometry(1, 1, 2),
@@ -199,6 +246,7 @@ function setupPlayerListeners() {
         );
         model.position.set(playData.x || 0, 0.6, playData.y || 0);
         scene.add(model);
+
         players[key] = { data: playData, model: model };
     });
 
@@ -207,86 +255,46 @@ function setupPlayerListeners() {
     });
 }
 
+// 100% Original Map Parser
+var map, trees, signs, startc, main;
 function loadMap() {
     scene.background = new THREE.Color(0x7fb0ff);
-    wallSegments = [];
 
-    var trackRaw = document.getElementById("trackcode") ? document.getElementById("trackcode").innerHTML.trim() : "";
-    if (!trackRaw) trackRaw = OG_TRACK_CODE.trim();
+    var trackElem = document.getElementById("trackcode");
+    if (!trackElem || !trackElem.innerHTML.includes("|")) return;
 
-    var parts = trackRaw.split("|");
+    var parts = trackElem.innerHTML.trim().split("|");
     var racedata = parts[0].trim().split(" ");
     var material = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xf48342) });
 
-    var mapObj = new THREE.Object3D();
-
+    map = new THREE.Object3D();
     for (var i = 0; i < racedata.length; i++) {
         if (racedata[i] == "" || !racedata[i].includes("/")) continue;
         var p1 = racedata[i].split("/")[0].split(",");
         var p2 = racedata[i].split("/")[1].split(",");
-        
-        var x1 = -parseFloat(p1[0]) * mapscale;
-        var z1 = parseFloat(p1[1]) * mapscale;
-        var x2 = -parseFloat(p2[0]) * mapscale;
-        var z2 = parseFloat(p2[1]) * mapscale;
-
-        var dx = x2 - x1;
-        var dz = z2 - z1;
-        var dist = Math.sqrt(dx * dx + dz * dz);
-        var angle = Math.atan2(dx, dz);
+        var point1 = new THREE.Vector2(parseFloat(p1[0]), parseFloat(p1[1]));
+        var point2 = new THREE.Vector2(parseFloat(p2[0]), parseFloat(p2[1]));
 
         var wall = new THREE.Mesh(
-            new THREE.BoxBufferGeometry(0.3, 1.5, dist + 0.3),
+            new THREE.BoxBufferGeometry(point1.distanceTo(point2) * mapscale + 0.3, 1.5, 0.3),
             material
         );
-        wall.position.set((x1 + x2) / 2, 0.75, (z1 + z2) / 2);
-        wall.rotation.y = angle;
-        mapObj.add(wall);
-
-        wallSegments.push({ x1: x1, z1: z1, x2: x2, z2: z2 });
+        var angle = Math.atan2((point1.y - point2.y), (point1.x - point2.x));
+        wall.position.set(-(point1.x + point2.x) / 2 * mapscale, 0.75, (point1.y + point2.y) / 2 * mapscale);
+        wall.rotation.set(0, angle, 0, "YXZ");
+        map.add(wall);
     }
-    scene.add(mapObj);
+    scene.add(map);
 
+    // Ground Plane
+    main = new THREE.Object3D();
     var ground = new THREE.Mesh(
-        new THREE.PlaneBufferGeometry(2000, 2000),
+        new THREE.PlaneBufferGeometry(1000, 1000),
         new THREE.MeshLambertMaterial({ color: new THREE.Color(0x57c115) })
     );
     ground.rotation.set(-Math.PI / 2, 0, 0);
-    scene.add(ground);
-}
-
-function checkWallCollisions(player) {
-    var px = player.x;
-    var pz = player.y;
-    var carRadius = 0.8;
-
-    for (var i = 0; i < wallSegments.length; i++) {
-        var w = wallSegments[i];
-        
-        var l2 = (w.x2 - w.x1) * (w.x2 - w.x1) + (w.z2 - w.z1) * (w.z2 - w.z1);
-        if (l2 === 0) continue;
-        var t = ((px - w.x1) * (w.x2 - w.x1) + (pz - w.z1) * (w.z2 - w.z1)) / l2;
-        t = Math.max(0, Math.min(1, t));
-
-        var nearestX = w.x1 + t * (w.x2 - w.x1);
-        var nearestZ = w.z1 + t * (w.z2 - w.z1);
-
-        var distX = px - nearestX;
-        var distZ = pz - nearestZ;
-        var distance = Math.sqrt(distX * distX + distZ * distZ);
-
-        if (distance < carRadius) {
-            var overlap = carRadius - distance;
-            var nx = distX / (distance || 1);
-            var nz = distZ / (distance || 1);
-
-            player.x += nx * overlap;
-            player.y += nz * overlap;
-
-            player.xv *= -BOUNCE;
-            player.yv *= -BOUNCE;
-        }
-    }
+    main.add(ground);
+    scene.add(main);
 }
 
 function join() {
@@ -322,8 +330,7 @@ function join() {
             if (right) me.data.steer = -Math.PI / 6;
             if (!(left ^ right)) me.data.steer = 0;
 
-            // Drive physics run once game is started
-            if (gameStarted && !gameSortaStarted) {
+            if (!gameSortaStarted && gameStarted) {
                 me.data.dir += me.data.steer / 10 * warp;
                 me.data.xv += Math.sin(me.data.dir) * SPEED * warp;
                 me.data.yv += Math.cos(me.data.dir) * SPEED * warp;
@@ -333,8 +340,6 @@ function join() {
 
                 me.data.x += me.data.xv * warp;
                 me.data.y += me.data.yv * warp;
-
-                checkWallCollisions(me.data);
 
                 me.model.position.x = me.data.x;
                 me.model.position.z = me.data.y;
